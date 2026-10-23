@@ -1,16 +1,15 @@
-import React from 'react';
-import { Sun, Moon, Sparkles, Compass, Clock, PlusCircle, ChevronLeft, ChevronRight, Palette, PiggyBank, Settings, ListChecks } from 'lucide-react';
-import { AccentColor, ThemeStyle, UserPreferences } from '../types';
+import React, { useState } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, PiggyBank, Settings, Sparkles, UserRound } from 'lucide-react';
 import { getRelativeDateLabel, getTodayDateString } from '../utils/timeline';
+import { SolisMark } from './SolisMark';
+
+type MainTab = 'timeline' | 'tasks' | 'timer' | 'finance' | 'settings';
 
 interface NavbarProps {
-  activeTab: 'timeline' | 'tasks' | 'timer' | 'log' | 'finance' | 'settings';
-  setActiveTab: (tab: 'timeline' | 'tasks' | 'timer' | 'log' | 'finance' | 'settings') => void;
+  activeTab: MainTab;
+  setActiveTab: (tab: MainTab) => void;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
-  preferences: UserPreferences;
-  onUpdatePreferences: (updates: Partial<UserPreferences>) => void;
-  onOpenQuickLog?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -18,218 +17,112 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   selectedDate,
   setSelectedDate,
-  preferences,
-  onUpdatePreferences,
 }) => {
-  const isPlayful = preferences.themeStyle === 'playful-animated';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const today = getTodayDateString();
 
-  const handlePrevDay = () => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() - 1);
-    const prevStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    setSelectedDate(prevStr);
+  const moveDate = (days: number) => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + days);
+    setSelectedDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
   };
 
-  const handleNextDay = () => {
-    const [y, m, d] = selectedDate.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() + 1);
-    const nextStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    setSelectedDate(nextStr);
+  const openSettings = (section?: string) => {
+    setActiveTab('settings');
+    setMenuOpen(false);
+    if (section) {
+      window.setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
   };
-
-  const accentColors: { id: AccentColor; label: string; bg: string }[] = [
-    { id: 'amber', label: 'Warm Amber', bg: 'bg-amber-500' },
-    { id: 'sage', label: 'Sage Calm', bg: 'bg-emerald-600' },
-    { id: 'ocean', label: 'Ocean Blue', bg: 'bg-sky-600' },
-    { id: 'lavender', label: 'Lavender', bg: 'bg-purple-500' },
-    { id: 'coral', label: 'Coral', bg: 'bg-rose-500' },
-  ];
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-md bg-white/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16 gap-4">
-          {/* Brand Identity */}
-          <div className="flex items-center gap-3">
+    <>
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-lg transition-colors dark:border-slate-800/80 dark:bg-slate-900/90">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="relative">
             <button
-              onClick={() => setActiveTab('timeline')}
-              className="flex items-center gap-2.5 text-left group focus:outline-none"
-              aria-label="Solis Home Dashboard"
+              type="button"
+              onClick={() => { setMenuOpen((open) => !open); setProfileOpen(false); }}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              aria-label="Open profile and app menu"
+              aria-expanded={menuOpen}
             >
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform ${
-                  isPlayful ? 'group-hover:rotate-12 group-hover:scale-105' : ''
-                } ${
-                  preferences.accentColor === 'amber'
-                    ? 'bg-gradient-to-tr from-amber-500 to-orange-400'
-                    : preferences.accentColor === 'sage'
-                    ? 'bg-gradient-to-tr from-emerald-600 to-teal-500'
-                    : preferences.accentColor === 'ocean'
-                    ? 'bg-gradient-to-tr from-sky-600 to-blue-500'
-                    : preferences.accentColor === 'lavender'
-                    ? 'bg-gradient-to-tr from-purple-500 to-indigo-400'
-                    : 'bg-gradient-to-tr from-rose-500 to-pink-400'
-                }`}
-              >
-                <Compass className="w-5 h-5" />
+              <SolisMark className="h-8 w-8" />
+            </button>
+            {menuOpen && (
+              <div className="absolute left-0 top-12 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Solis</p>
+                <button type="button" onClick={() => setProfileOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                  <UserRound className="h-4 w-4" /> Profile
+                </button>
+                <button type="button" onClick={() => openSettings()} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                  <Settings className="h-4 w-4" /> Settings
+                </button>
+                <button type="button" onClick={() => openSettings('appearance-settings')} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+                  <Sparkles className="h-4 w-4" /> Appearance
+                </button>
+                {profileOpen && (
+                  <div className="m-1 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900 dark:text-slate-300" role="status">
+                    Local profile · Your tasks and reflections stay on this device unless you choose to share selected context.
+                  </div>
+                )}
               </div>
-              <div>
-                <span className="font-bold tracking-tight text-lg text-slate-900 dark:text-white flex items-center gap-1.5">
-                  Solis
-                  {isPlayful && <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 font-medium">gentle</span>}
-                </span>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">Whole-Day Life & Focus</p>
-              </div>
-            </button>
-          </div>
-
-          {/* Date Picker Navigation */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
-            <button
-              onClick={handlePrevDay}
-              className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-              aria-label="Previous day"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="px-2 text-center min-w-[110px]">
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
-                {getRelativeDateLabel(selectedDate)}
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-mono">
-                {selectedDate}
-              </span>
-            </div>
-            <button
-              onClick={handleNextDay}
-              className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-              aria-label="Next day"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            {selectedDate !== today && (
-              <button
-                onClick={() => setSelectedDate(today)}
-                className="text-[11px] font-medium text-amber-600 dark:text-amber-400 hover:underline px-1.5"
-              >
-                Today
-              </button>
             )}
           </div>
 
-          {/* Theme & Controls */}
-          <div className="flex items-center gap-2">
-            {/* Theme Style Toggle */}
-            <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium">
-              <button
-                onClick={() => onUpdatePreferences({ themeStyle: 'clean-minimal' })}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  preferences.themeStyle === 'clean-minimal'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-                }`}
-                title="Clean Minimal Style"
-              >
-                Minimal
-              </button>
-              <button
-                onClick={() => onUpdatePreferences({ themeStyle: 'playful-animated' })}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                  preferences.themeStyle === 'playful-animated'
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-                }`}
-                title="Playful Animated Style"
-              >
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                Playful
-              </button>
-            </div>
+          <div className="text-center">
+            <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">Solis</h1>
+            <p className="hidden text-[10px] text-slate-500 dark:text-slate-400 sm:block">Whole-Day Life & Focus</p>
+          </div>
 
-            {/* Accent Color Picker Dropdown/Cycle */}
-            <div className="relative group">
-              <button
-                className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                aria-label="Change Accent Color"
-                title="Change Color Theme"
-              >
-                <Palette className="w-4 h-4" />
-              </button>
-              <div className="absolute right-0 mt-2 hidden group-hover:flex group-focus-within:flex flex-col gap-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 min-w-[140px]">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 px-2 py-1">Accent Color</span>
-                {accentColors.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => onUpdatePreferences({ accentColor: c.id })}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors ${
-                      preferences.accentColor === c.id
-                        ? 'bg-slate-100 dark:bg-slate-700 font-semibold text-slate-900 dark:text-white'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750'
-                    }`}
-                  >
-                    <span className={`w-3.5 h-3.5 rounded-full ${c.bg}`} />
-                    {c.label}
-                  </button>
-                ))}
-              </div>
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800">
+            <button type="button" onClick={() => moveDate(-1)} className="rounded-lg p-1.5 text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700" aria-label="Previous day">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-[86px] text-center sm:min-w-[110px]">
+              <span className="block text-[11px] font-semibold text-slate-800 dark:text-slate-200">{getRelativeDateLabel(selectedDate)}</span>
+              <span className="hidden font-mono text-[9px] text-slate-500 sm:block">{selectedDate}</span>
             </div>
-
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={() => onUpdatePreferences({ darkMode: !preferences.darkMode })}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              aria-label={preferences.darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {preferences.darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
+            <button type="button" onClick={() => moveDate(1)} className="rounded-lg p-1.5 text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700" aria-label="Next day">
+              <ChevronRight className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`p-2 rounded-xl transition-colors ${
-                activeTab === 'settings'
-                  ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-              aria-label="Open Settings"
-              title="Settings, tracking and AI"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+            {selectedDate !== today && (
+              <button type="button" onClick={() => setSelectedDate(today)} className="px-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300">Today</button>
+            )}
+            <CalendarDays className="mr-1 hidden h-3.5 w-3.5 text-slate-400 sm:block" aria-hidden="true" />
           </div>
         </div>
-
-      </div>
+      </header>
       <nav
-        className="fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/70 bg-white/80 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(15_23_42/0.06)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/80"
         aria-label="Main navigation"
       >
-        <div className="max-w-2xl mx-auto grid grid-cols-6 gap-1 px-2 py-1.5">
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-3 py-2">
           {[
             { id: 'timeline' as const, label: 'Today', icon: Clock },
-            { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
+            { id: 'tasks' as const, label: 'Plan', icon: ListChecks },
             { id: 'timer' as const, label: 'Focus', icon: Sparkles },
-            { id: 'log' as const, label: 'Log', icon: PlusCircle },
             { id: 'finance' as const, label: 'Money', icon: PiggyBank },
-            { id: 'settings' as const, label: 'Settings', icon: Settings },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setActiveTab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 activeTab === id
-                  ? 'border-amber-200 bg-amber-50 text-amber-800 shadow-sm dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200'
-                  : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800'
+                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200'
+                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
               }`}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="h-[18px] w-[18px]" />
               {label}
             </button>
           ))}
         </div>
       </nav>
-    </header>
+    </>
   );
 };

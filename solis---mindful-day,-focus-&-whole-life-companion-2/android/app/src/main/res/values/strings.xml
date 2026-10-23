@@ -4,4 +4,8 @@
     <string name="title_activity_main">Solis</string>
     <string name="package_name">com.solis.app</string>
     <string name="custom_url_scheme">com.solis.app</string>
+    <string name="widget_today_name">Solis Today’s tasks</string>
+    <string name="widget_focus_name">Solis Focus timer</string>
+    <string name="widget_goals_name">Solis Goals and streak</string>
+    <string name="widget_usage_name">Solis Daily stats</string>
 </resources>

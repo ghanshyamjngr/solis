@@ -1,1 +1,99 @@
 @import "tailwindcss";
+
+:root {
+  --solis-accent: #f59e0b;
+  --solis-accent-soft: #fffbeb;
+  --solis-accent-border: #fde68a;
+  accent-color: var(--solis-accent);
+}
+
+html[data-accent="sage"] {
+  --solis-accent: #059669;
+  --solis-accent-soft: #ecfdf5;
+  --solis-accent-border: #a7f3d0;
+}
+
+html[data-accent="ocean"] {
+  --solis-accent: #0284c7;
+  --solis-accent-soft: #f0f9ff;
+  --solis-accent-border: #bae6fd;
+}
+
+html[data-accent="lavender"] {
+  --solis-accent: #9333ea;
+  --solis-accent-soft: #faf5ff;
+  --solis-accent-border: #e9d5ff;
+}
+
+html[data-accent="coral"] {
+  --solis-accent: #e11d48;
+  --solis-accent-soft: #fff1f2;
+  --solis-accent-border: #fecdd3;
+}
+
+html[data-accent="wallpaper"] {
+  --solis-accent: var(--solis-wallpaper-accent, #f59e0b);
+  --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 65%, black);
+  --solis-accent-soft: color-mix(in srgb, var(--solis-accent) 12%, white);
+  --solis-accent-border: color-mix(in srgb, var(--solis-accent) 42%, white);
+}
+
+html.dark[data-accent="wallpaper"] {
+  --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 72%, white);
+}
+
+html[data-accent] [class~="bg-amber-500"],
+html[data-accent] [class~="bg-amber-600"] {
+  background-color: var(--solis-accent) !important;
+}
+
+html[data-accent] [class~="text-amber-600"],
+html[data-accent] [class~="text-amber-700"],
+html[data-accent] [class~="text-amber-800"] {
+  color: var(--solis-accent) !important;
+}
+
+html[data-accent="wallpaper"] [class~="text-amber-600"],
+html[data-accent="wallpaper"] [class~="text-amber-700"],
+html[data-accent="wallpaper"] [class~="text-amber-800"] {
+  color: var(--solis-accent-strong) !important;
+}
+
+html[data-accent] [class~="bg-amber-50"],
+html[data-accent] [class~="bg-amber-100"] {
+  background-color: var(--solis-accent-soft) !important;
+}
+
+html[data-accent] [class~="border-amber-200"] {
+  border-color: var(--solis-accent-border) !important;
+}
+
+html[data-theme-style="clean-minimal"] [class~="rounded-3xl"] {
+  border-radius: 1rem;
+}
+
+html[data-theme-style="playful-animated"] [class~="shadow-sm"],
+html[data-theme-style="playful-animated"] [class~="shadow-xs"] {
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.08);
+}
+
+html[data-theme-style="soft-glass"] [class~="rounded-3xl"] {
+  background-color: rgb(255 255 255 / 0.76);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgb(15 23 42 / 0.08);
+}
+
+html.dark[data-theme-style="soft-glass"] [class~="rounded-3xl"] {
+  background-color: rgb(30 41 59 / 0.78);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

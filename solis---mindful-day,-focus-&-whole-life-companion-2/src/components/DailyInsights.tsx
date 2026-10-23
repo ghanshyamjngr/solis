@@ -18,11 +18,44 @@ import {
   Lightbulb,
   CheckCircle2,
   ShieldCheck,
+  Check,
+  Pencil,
+  ThumbsDown,
+  X,
 } from 'lucide-react';
 import { ActivityCategory, ActivityEntry, AiDailyReflection, DailyDeviceUsage, PlannedTask, UserPreferences } from '../types';
 import { calculateDetailedInsights, formatDuration } from '../utils/timeline';
+import { loadRecentStoredDeviceUsage } from '../utils/storage';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') ?? '';
+type SuggestionResponse = {
+  date: string;
+  action: 'accepted' | 'dismissed' | 'not-useful' | 'edited';
+  editedSummary?: string;
+};
+
+function loadRecentSuggestionFeedback(endDate: string): Array<{ date: string; action: SuggestionResponse['action'] }> {
+  if (typeof window === 'undefined') return [];
+  const [year, month, day] = endDate.split('-').map(Number);
+  const cursor = new Date(year, month - 1, day);
+  const result: Array<{ date: string; action: SuggestionResponse['action'] }> = [];
+  for (let offset = 3; offset >= 1; offset -= 1) {
+    const date = new Date(cursor);
+    date.setDate(date.getDate() - offset);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    try {
+      const raw = localStorage.getItem(`solis_suggestion_response_${dateKey}`);
+      if (!raw) continue;
+      const saved = JSON.parse(raw) as SuggestionResponse;
+      if (['accepted', 'dismissed', 'not-useful', 'edited'].includes(saved.action)) {
+        result.push({ date: dateKey, action: saved.action });
+      }
+    } catch (error) {
+      console.error(`Could not load suggestion feedback for ${dateKey}`, error);
+    }
+  }
+  return result;
+}
 
 interface DailyInsightsProps {
   entries: ActivityEntry[];
@@ -30,6 +63,8 @@ interface DailyInsightsProps {
   deviceUsage: DailyDeviceUsage | null;
   usageTrackingEnabled: boolean;
   usageStatus: string;
+  isUsageRefreshing: boolean;
+  onRefreshUsage: () => void;
   selectedDate: string;
   preferences: UserPreferences;
   onStartFocus?: () => void;
@@ -42,16 +77,54 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   deviceUsage,
   usageTrackingEnabled,
   usageStatus,
+  isUsageRefreshing,
+  onRefreshUsage,
   selectedDate,
   preferences,
   onStartFocus,
   onLogOffline,
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [showSystemApps, setShowSystemApps] = useState(false);
   const [aiInsight, setAiInsight] = useState<AiDailyReflection | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
+  const [aiStatus, setAiStatus] = useState('Personalized suggestions are optional.');
+  const [suggestionResponse, setSuggestionResponse] = useState<SuggestionResponse | null>(null);
+  const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
+  const [editedSummary, setEditedSummary] = useState('');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`solis_suggestion_response_${selectedDate}`);
+      setSuggestionResponse(saved ? JSON.parse(saved) as SuggestionResponse : null);
+      setIsEditingSuggestion(false);
+    } catch (error) {
+      console.error('Could not load saved suggestion response', error);
+      setSuggestionResponse(null);
+    }
+  }, [selectedDate]);
+
+  const recordSuggestionResponse = (response: SuggestionResponse) => {
+    try {
+      localStorage.setItem(`solis_suggestion_response_${selectedDate}`, JSON.stringify(response));
+      setSuggestionResponse(response);
+      setIsEditingSuggestion(false);
+      setAiStatus(response.action === 'accepted'
+        ? 'Suggestion accepted and saved on this device.'
+        : response.action === 'edited'
+          ? 'Your edited suggestion is saved on this device.'
+          : response.action === 'not-useful'
+            ? 'Feedback saved; this suggestion is hidden.'
+            : 'Suggestion dismissed and saved on this device.');
+    } catch (error) {
+      console.error('Could not save suggestion response', error);
+      setAiStatus('Could not save your suggestion response on this device.');
+    }
+  };
 
   const dayEntries = entries.filter((e) => e.date === selectedDate);
+  const recentDeviceUsage = loadRecentStoredDeviceUsage(selectedDate, 7);
+  const latestDeviceSync = [...recentDeviceUsage].sort((a, b) => b.syncedAt - a.syncedAt)[0];
   const firstContextDate = new Date(`${selectedDate}T12:00:00`);
   firstContextDate.setDate(firstContextDate.getDate() - 3);
   const contextStartDate = `${firstContextDate.getFullYear()}-${String(firstContextDate.getMonth() + 1).padStart(2, '0')}-${String(firstContextDate.getDate()).padStart(2, '0')}`;
@@ -74,9 +147,21 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
       repeat: task.repeat,
       completed: task.completedDates.includes(date),
     })));
+  const usageSummary = preferences.aiUsageDataSharingConsent
+    ? recentDeviceUsage.slice(-4).map((snapshot) => ({
+        date: snapshot.date,
+        screenOnMinutes: Math.round(snapshot.screen.screenOnDurationMs / 60000),
+        foregroundAppMinutes: Math.round(snapshot.apps.reduce((total, app) => total + app.totalTimeInForegroundMs, 0) / 60000),
+      }))
+    : [];
+  const recentSuggestionFeedback = preferences.aiDataSharingConsent
+    ? loadRecentSuggestionFeedback(selectedDate)
+    : [];
   const contextSignature = JSON.stringify({
-    activities: contextEntries.map(({ date, category, title, durationMinutes, notes }) => ({ date, category, title, durationMinutes, notes })),
+    activities: contextEntries.map(({ date, category, durationMinutes }) => ({ date, category, durationMinutes })),
     tasks: contextTasks,
+    usageSummary,
+    recentSuggestionFeedback,
   });
   const stats = calculateDetailedInsights(
     dayEntries,
@@ -137,30 +222,33 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   };
 
   const fetchAiInsights = async () => {
-    if (contextEntries.length === 0 && contextTasks.length === 0) {
+    if (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0) {
       setAiInsight(null);
+      setAiStatus('No recent synced or logged data is available for a suggestion.');
       return;
     }
 
-    if (!preferences.aiDataSharingConsent) {
+    if (!preferences.aiDataSharingConsent && !preferences.aiUsageDataSharingConsent) {
       setAiInsight(generateLocalReflection());
+      setAiStatus('Local suggestion; no activity or device usage was sent to Gemini.');
       return;
     }
 
     setIsLoadingAi(true);
+    setAiStatus(preferences.aiUsageDataSharingConsent
+      ? 'Preparing only the categories you explicitly enabled for sharing…'
+      : 'Preparing recent activity and task context…');
     try {
       const res = await fetch(`${apiBaseUrl}/api/ai-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          activities: contextEntries.map(({ date, category, title, durationMinutes, notes }) => ({
-            date,
-            category,
-            title,
-            durationMinutes,
-            notes,
-          })),
-          tasks: contextTasks,
+          activities: preferences.aiDataSharingConsent
+            ? contextEntries.map(({ date, category, durationMinutes }) => ({ date, category, durationMinutes }))
+            : [],
+          tasks: preferences.aiDataSharingConsent ? contextTasks : [],
+          deviceUsageSummary: preferences.aiUsageDataSharingConsent ? usageSummary : [],
+          suggestionFeedback: preferences.aiDataSharingConsent ? recentSuggestionFeedback : [],
           preferences: { encouragementTone: preferences.encouragementTone },
           selectedDate,
           contextDays: 4,
@@ -171,22 +259,30 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
         const data = await res.json();
         if (data.available && data.insight) {
           setAiInsight(data.insight);
+          setAiStatus('Gemini suggestion based on the sharing options you enabled. Tracked facts remain separate.');
           setIsLoadingAi(false);
           return;
         }
+        setAiStatus(data.reason || data.error || 'Gemini is currently unavailable.');
       }
+      else setAiStatus('Gemini server is unavailable; a local reflection is shown instead.');
     } catch {
-      // Graceful local fallback
+      setAiStatus('Gemini server could not be reached; a local reflection is shown instead.');
     }
 
-    // Fallback to local intelligent engine
     setAiInsight(generateLocalReflection());
     setIsLoadingAi(false);
   };
 
   useEffect(() => {
     fetchAiInsights();
-  }, [selectedDate, contextSignature, preferences.aiDataSharingConsent]);
+  }, [
+    selectedDate,
+    contextSignature,
+    preferences.aiDataSharingConsent,
+    preferences.aiUsageDataSharingConsent,
+    preferences.encouragementTone,
+  ]);
 
   const getCategoryIcon = (cat: ActivityCategory) => {
     switch (cat) {
@@ -223,7 +319,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
             <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
               Daily Insights & Activity Breakdown
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {formatDuration(stats.totalTrackedMinutes)} Logged
+                {formatDuration(stats.totalTrackedMinutes)} manually logged
               </span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -235,9 +331,9 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={fetchAiInsights}
-            disabled={isLoadingAi || dayEntries.length === 0}
+            disabled={isLoadingAi || (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            title={dayEntries.length === 0 ? 'Log real activity to see insights' : 'Refresh AI Insights'}
+            title={contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0 ? 'Sync usage or add a real task or activity first' : 'Refresh Solis suggestion'}
             aria-label="Refresh AI Insights"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingAi ? 'animate-spin text-amber-500' : ''}`} />
@@ -268,20 +364,34 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                   UsageStats reports foreground app time; screen-on events are not touch-level interaction.
                 </p>
               </div>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                {deviceUsage
-                  ? `Last sync ${new Date(deviceUsage.syncedAt).toLocaleString()}${usageTrackingEnabled ? '' : ' · tracking off'}`
-                  : usageTrackingEnabled ? 'Not synced yet' : 'Tracking off'}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {deviceUsage
+                    ? `Last sync ${new Date(deviceUsage.syncedAt).toLocaleString()}${usageTrackingEnabled ? '' : ' · tracking off'}`
+                    : latestDeviceSync
+                      ? `Last successful sync ${latestDeviceSync.date} · ${new Date(latestDeviceSync.syncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · selected day not synced`
+                      : usageTrackingEnabled ? 'Not synced yet' : 'Tracking off'}
+                </span>
+                <button
+                  type="button"
+                  onClick={onRefreshUsage}
+                  disabled={isUsageRefreshing || !usageTrackingEnabled}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 dark:border-sky-800 px-2.5 py-1.5 text-[11px] font-semibold text-sky-800 dark:text-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Refresh Android app usage"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isUsageRefreshing ? 'animate-spin' : ''}`} />
+                  {isUsageRefreshing ? 'Refreshing' : 'Refresh'}
+                </button>
+              </div>
             </div>
 
             {!usageTrackingEnabled ? (
               <p className="text-xs text-slate-600 dark:text-slate-300">Tracking is off. Turn it on in Settings and grant Android Usage Access to see real device usage. Manual logs above are not device-tracked.</p>
             ) : !deviceUsage ? (
-              <p className="text-xs text-slate-600 dark:text-slate-300">{usageStatus} App usage is read after Solis opens or returns to the foreground.</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{usageStatus} App usage is read when Solis opens or returns to the foreground; pull down to refresh manually.</p>
             ) : (
               <>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300" role="status">{usageStatus}</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300" role="status">{isUsageRefreshing ? 'Refreshing Android usage…' : usageStatus} · Pull down to refresh</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-white/80 dark:bg-slate-900/60 p-3">
                     <span className="block text-[10px] text-slate-500 dark:text-slate-400">Screen-on time</span>
@@ -297,13 +407,32 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                 {deviceUsage.apps.length === 0 ? (
                   <p className="text-xs text-slate-600 dark:text-slate-300">Android returned no per-app usage for this date. This can happen when there is no recorded activity or the device has not populated the usage report yet.</p>
                 ) : (
+                  <>
                   <ul className="divide-y divide-sky-100 dark:divide-slate-700">
                     {[...deviceUsage.apps]
+                      .filter((app) => showSystemApps || !app.isSystemApp)
                       .sort((a, b) => b.totalTimeInForegroundMs - a.totalTimeInForegroundMs)
-                      .slice(0, 6)
                       .map((app) => (
                         <li key={app.packageName} className="flex items-center justify-between gap-3 py-2 text-xs">
-                          <span className="min-w-0 truncate font-medium text-slate-800 dark:text-slate-200">{app.appName}</span>
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            {app.appIconDataUrl ? <img src={app.appIconDataUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain" /> : (
+                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sky-100 text-[10px] font-bold text-sky-800 dark:bg-slate-700 dark:text-sky-200" aria-hidden="true">
+                                {(app.appName || app.packageName).slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <strong className="block truncate font-medium text-slate-800 dark:text-slate-200">
+                                {app.appName && app.appName !== app.packageName ? app.appName : 'Unknown app'}
+                              </strong>
+                              {(!app.appName || app.appName === app.packageName || app.appName === 'Unknown app') && <span className="block truncate text-[10px] text-slate-500">{app.packageName}</span>}
+                              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-700" role="progressbar" aria-label={`${app.appName || 'Unknown app'} foreground share`}>
+                                <span
+                                  className="block h-full rounded-full bg-sky-600 dark:bg-sky-400"
+                                  style={{ width: `${Math.max(2, Math.round((app.totalTimeInForegroundMs / Math.max(1, ...deviceUsage.apps.map((item) => item.totalTimeInForegroundMs))) * 100))}%` }}
+                                />
+                              </span>
+                            </span>
+                          </span>
                           <span className="shrink-0 text-right text-slate-600 dark:text-slate-300">
                             <strong className="block font-mono">{formatDuration(Math.round(app.totalTimeInForegroundMs / 60000))}</strong>
                             <span className="text-[10px]">{app.launchCount} opens · last used {new Date(app.lastUsedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -311,6 +440,51 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                         </li>
                       ))}
                   </ul>
+                  {deviceUsage.apps.some((app) => app.isSystemApp) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSystemApps((show) => !show)}
+                      className="mt-2 rounded-lg px-2 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100 dark:text-sky-200 dark:hover:bg-slate-800"
+                    >
+                      {showSystemApps ? 'Hide system apps' : 'Show system apps'}
+                    </button>
+                  )}
+                  {recentDeviceUsage.length > 0 && (
+                    <div className="mt-4 border-t border-sky-100 pt-3 dark:border-slate-700">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Synced device usage · last 7 days</h5>
+                        <span className="flex gap-3 text-[10px] text-slate-600 dark:text-slate-300">
+                          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-600" />Foreground apps</span>
+                          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-violet-500" />Screen-on</span>
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {recentDeviceUsage.map((snapshot) => {
+                          const foregroundMs = snapshot.apps.reduce((total, app) => total + app.totalTimeInForegroundMs, 0);
+                          const maxMs = Math.max(1, ...recentDeviceUsage.flatMap((item) => [
+                            item.apps.reduce((total, app) => total + app.totalTimeInForegroundMs, 0),
+                            item.screen.screenOnDurationMs,
+                          ]));
+                          return (
+                            <div key={snapshot.date} className="grid grid-cols-[44px_1fr_auto] items-center gap-2 text-[10px]">
+                              <span className="text-slate-500">{snapshot.date.slice(5)}</span>
+                              <div className="space-y-1" aria-label={`${snapshot.date}: ${formatDuration(Math.round(foregroundMs / 60000))} foreground app time; ${formatDuration(Math.round(snapshot.screen.screenOnDurationMs / 60000))} screen-on time`}>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-700">
+                                  <div className="h-full rounded-full bg-sky-600" style={{ width: `${Math.round((foregroundMs / maxMs) * 100)}%` }} />
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-violet-100 dark:bg-slate-700">
+                                  <div className="h-full rounded-full bg-violet-500" style={{ width: `${Math.round((snapshot.screen.screenOnDurationMs / maxMs) * 100)}%` }} />
+                                </div>
+                              </div>
+                              <span className="text-right text-slate-600 dark:text-slate-300">{formatDuration(Math.round(foregroundMs / 60000))} / {formatDuration(Math.round(snapshot.screen.screenOnDurationMs / 60000))}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">Only days with a saved Android sync are shown. Foreground-app time and screen-on time are different measurements and are not added together.</p>
+                    </div>
+                  )}
+                  </>
                 )}
                 <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
                   Android reports app usage, not visited websites. Website-level tracking needs a separate browser-specific extension/integration; Solis cannot infer sites from browser usage.
@@ -456,12 +630,13 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
           </div>
 
           {/* Mindful AI Reflection Card */}
-          {aiInsight && (
+          {aiInsight && !(suggestionResponse?.date === selectedDate
+            && ['dismissed', 'not-useful'].includes(suggestionResponse.action)) && (
             <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-50/70 via-sky-50/40 to-emerald-50/50 dark:from-slate-900/90 dark:to-slate-900/60 border border-amber-200/70 dark:border-slate-700 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  Mindful Behavioral Reflection
+                  Solis suggestion · not a tracked fact
                   <span className="text-[10px] font-normal text-slate-400 ml-1">
                     ({aiInsight.source === 'gemini' ? 'Gemini 3.8 Flash' : 'On-Device Intelligence'})
                   </span>
@@ -471,13 +646,38 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                 </span>
               </div>
 
-              <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                {aiInsight.summary}
-              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400" role="status">{aiStatus}</p>
 
-              <p className="text-xs text-slate-600 dark:text-slate-400 italic">
-                "{aiInsight.encouragement}"
-              </p>
+              {isEditingSuggestion ? (
+                <div className="space-y-2">
+                  <label className="sr-only" htmlFor="edit-solis-suggestion">Edit suggestion</label>
+                  <textarea
+                    id="edit-solis-suggestion"
+                    value={editedSummary}
+                    onChange={(event) => setEditedSummary(event.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => recordSuggestionResponse({ date: selectedDate, action: 'edited', editedSummary: editedSummary.trim() || aiInsight.summary })}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-white dark:text-slate-900"
+                  >
+                    Save edit
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+                  {suggestionResponse?.editedSummary ?? aiInsight.summary}
+                </p>
+              )}
+
+              {preferences.encouragementTone !== 'off' && aiInsight.encouragement && (
+                <p className="text-xs text-slate-600 dark:text-slate-400 italic">
+                  "{aiInsight.encouragement}"
+                </p>
+              )}
 
               {aiInsight.gentleNudge && (
                 <div className="flex items-start gap-2 pt-1 text-xs text-amber-900 dark:text-amber-200 bg-amber-100/60 dark:bg-amber-950/40 p-2.5 rounded-xl border border-amber-200/50 dark:border-amber-900/50">
@@ -485,7 +685,27 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                   <span>{aiInsight.gentleNudge}</span>
                 </div>
               )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button type="button" onClick={() => recordSuggestionResponse({ date: selectedDate, action: 'accepted', editedSummary: suggestionResponse?.editedSummary })} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-800 dark:border-emerald-800 dark:text-emerald-200">
+                  <Check className="h-3 w-3" /> Accept
+                </button>
+                <button type="button" onClick={() => { setEditedSummary(suggestionResponse?.editedSummary ?? aiInsight.summary); setIsEditingSuggestion(true); }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  <Pencil className="h-3 w-3" /> Edit
+                </button>
+                <button type="button" onClick={() => recordSuggestionResponse({ date: selectedDate, action: 'not-useful' })} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  <ThumbsDown className="h-3 w-3" /> Not useful
+                </button>
+                <button type="button" onClick={() => recordSuggestionResponse({ date: selectedDate, action: 'dismissed' })} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                  <X className="h-3 w-3" /> Dismiss
+                </button>
+              </div>
             </div>
+          )}
+          {aiInsight && suggestionResponse?.date === selectedDate
+            && ['dismissed', 'not-useful'].includes(suggestionResponse.action) && (
+            <button type="button" onClick={() => recordSuggestionResponse({ date: selectedDate, action: 'accepted', editedSummary: suggestionResponse.editedSummary })} className="text-xs font-semibold text-sky-800 underline dark:text-sky-200">
+              Show suggestion again
+            </button>
           )}
           </>}
         </div>

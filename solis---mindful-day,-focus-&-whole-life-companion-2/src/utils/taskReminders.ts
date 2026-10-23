@@ -12,8 +12,45 @@ interface TaskRemindersPlugin {
     repeat: 'never' | 'daily' | 'weekly';
   }): Promise<void>;
   cancel(options: { id: string }): Promise<void>;
-  updateWidget(options: { nextTask: string; progress: string }): Promise<void>;
-  consumePendingReminder(): Promise<{ taskId?: string; openTasks?: boolean }>;
+  updateWidget(options: Partial<{
+    nextTask: string;
+    progress: string;
+    focus: string;
+    focusAction: string;
+    goals: string;
+    streak: string;
+    usage: string;
+    lastSync: string;
+  }>): Promise<void>;
+  consumePendingReminder(): Promise<{
+    taskId?: string;
+    openTasks?: boolean;
+    widgetAction?: string;
+    answer?: 'completed' | 'postponed' | 'skipped';
+    answerTaskId?: string;
+    answerDate?: string;
+  }>;
+  getWallpaperAccent(): Promise<{ color?: string }>;
+  notifyGoalComplete(options: {
+    notificationTitle: string;
+    message: string;
+    soundEnabled: boolean;
+    vibrationEnabled: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+  }): Promise<void>;
+  configureUsageEncouragement(options: {
+    enabled: boolean;
+    thresholdMinutes: number;
+    frequencyDays: number;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+    tone: 'gentle' | 'poetic' | 'practical' | 'off';
+    completedCheckins: number;
+    plannedCheckins: number;
+    soundEnabled: boolean;
+    vibrationEnabled: boolean;
+  }): Promise<{ scheduled: boolean }>;
 }
 
 const NativeReminders = registerPlugin<TaskRemindersPlugin>('TaskReminders');
@@ -132,10 +169,90 @@ export async function updateTaskWidget(tasks: PlannedTask[], date: string): Prom
   });
 }
 
-export async function consumePendingTaskReminder(): Promise<{ taskId: string | null; openTasks: boolean }> {
-  if (!isNativeReminderPlatform()) return { taskId: null, openTasks: false };
+export async function updateWidgetData(data: Parameters<TaskRemindersPlugin['updateWidget']>[0]): Promise<void> {
+  if (!isNativeReminderPlatform()) return;
+  await NativeReminders.updateWidget(data);
+}
+
+export async function getNativeWallpaperAccent(): Promise<string | null> {
+  if (!isNativeReminderPlatform()) return null;
+  const result = await NativeReminders.getWallpaperAccent();
+  return result.color ?? null;
+}
+
+export async function notifyGoalCompleted(
+  notificationTitle: string,
+  message: string,
+  soundEnabled: boolean,
+  vibrationEnabled: boolean,
+  quietHoursStart: string,
+  quietHoursEnd: string,
+): Promise<void> {
+  if (isNativeReminderPlatform()) {
+    await NativeReminders.notifyGoalComplete({
+      notificationTitle,
+      message,
+      soundEnabled,
+      vibrationEnabled,
+      quietHoursStart,
+      quietHoursEnd,
+    });
+    return;
+  }
+  if (!('Notification' in window)) throw new Error('This browser does not support notifications.');
+  if (Notification.permission !== 'granted') throw new Error('Notification permission is not granted.');
+  const current = new Date().getHours() * 60 + new Date().getMinutes();
+  const [startHour, startMinute] = quietHoursStart.split(':').map(Number);
+  const [endHour, endMinute] = quietHoursEnd.split(':').map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  const quiet = Number.isFinite(start) && Number.isFinite(end) && start !== end
+    && (start < end ? current >= start && current < end : current >= start || current < end);
+  new Notification(notificationTitle, {
+    body: message,
+    tag: `solis-${notificationTitle}`,
+    silent: quiet || !soundEnabled,
+  });
+}
+
+export async function configureUsageEncouragement(options: {
+  enabled: boolean;
+  thresholdMinutes: number;
+  frequencyDays: number;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  tone: 'gentle' | 'poetic' | 'practical' | 'off';
+  completedCheckins: number;
+  plannedCheckins: number;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+}): Promise<boolean> {
+  if (!isNativeReminderPlatform()) return false;
+  const result = await NativeReminders.configureUsageEncouragement(options);
+  return result.scheduled;
+}
+
+export async function consumePendingTaskReminder(): Promise<{
+  taskId: string | null;
+  openTasks: boolean;
+  widgetAction: string | null;
+  answer: 'completed' | 'postponed' | 'skipped' | null;
+  answerTaskId: string | null;
+  answerDate: string | null;
+}> {
+  if (!isNativeReminderPlatform()) return {
+    taskId: null, openTasks: false, widgetAction: null,
+    answer: null, answerTaskId: null, answerDate: null,
+  };
   const result = await NativeReminders.consumePendingReminder();
-  return { taskId: result.taskId ?? null, openTasks: result.openTasks ?? false };
+  return {
+    taskId: result.taskId ?? null,
+    openTasks: result.openTasks ?? false,
+    widgetAction: result.widgetAction ?? null,
+    answer: result.answer ?? null,
+    answerTaskId: result.answerTaskId ?? null,
+    answerDate: result.answerDate ?? null,
+  };
 }
 
 export async function restoreGrantedWebReminders(tasks: PlannedTask[]): Promise<void> {

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -34,6 +41,15 @@
         </receiver>
 
         <receiver
+            android:name=".UsageEncouragementReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.solis.app.USAGE_ENCOURAGEMENT_CHECK" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".SolisBootReceiver"
             android:enabled="true"
             android:exported="true">
@@ -44,6 +60,7 @@
 
         <receiver
             android:name=".SolisWidgetProvider"
+            android:label="@string/widget_today_name"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -52,6 +69,33 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/solis_widget_info" />
         </receiver>
+        <receiver android:name=".FocusWidgetProvider" android:label="@string/widget_focus_name" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/solis_focus_widget_info" />
+        </receiver>
+        <receiver android:name=".GoalsWidgetProvider" android:label="@string/widget_goals_name" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/solis_goals_widget_info" />
+        </receiver>
+        <receiver android:name=".UsageWidgetProvider" android:label="@string/widget_usage_name" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/solis_usage_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".FocusTimerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started focus timer with ongoing notification controls" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -70,4 +114,7 @@
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 </manifest>

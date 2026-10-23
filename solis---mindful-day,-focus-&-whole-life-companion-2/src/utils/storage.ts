@@ -15,14 +15,21 @@ const STORAGE_KEYS = {
 export const DEFAULT_PREFERENCES: UserPreferences = {
   themeStyle: 'playful-animated',
   accentColor: 'amber',
+  appearanceMode: 'system',
   darkMode: false,
   soundEnabled: true,
+  vibrationEnabled: true,
+  goalCompletionNotificationsEnabled: true,
+  usageEncouragementNotificationsEnabled: false,
+  usageEncouragementThresholdMinutes: 120,
+  usageEncouragementFrequencyDays: 1,
   quietHoursStart: '22:00',
   quietHoursEnd: '07:30',
   encouragementTone: 'gentle',
   dailyFocusGoalMinutes: 120,
   dailyOfflineGoalMinutes: 180,
   aiDataSharingConsent: false,
+  aiUsageDataSharingConsent: false,
   usageTrackingEnabled: false,
 };
 
@@ -59,6 +66,12 @@ export function loadStoredTasks(): PlannedTask[] {
       completedDates: Array.isArray(task.completedDates)
         ? task.completedDates.filter((date: unknown): date is string => typeof date === 'string')
         : [],
+      skippedDates: Array.isArray(task.skippedDates)
+        ? task.skippedDates.filter((date: unknown): date is string => typeof date === 'string')
+        : [],
+      checkinResponses: task.checkinResponses && typeof task.checkinResponses === 'object'
+        ? task.checkinResponses
+        : {},
       createdAt: Number.isFinite(task.createdAt) ? task.createdAt : Date.now(),
     }));
   } catch (error) {
@@ -130,7 +143,13 @@ export function loadStoredPreferences(): UserPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PREFERENCES);
     if (!raw) return DEFAULT_PREFERENCES;
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
+    const stored = JSON.parse(raw);
+    return {
+      ...DEFAULT_PREFERENCES,
+      ...stored,
+      appearanceMode: stored.appearanceMode
+        ?? (stored.darkMode === true ? 'dark' : stored.darkMode === false ? 'light' : DEFAULT_PREFERENCES.appearanceMode),
+    };
   } catch {
     return DEFAULT_PREFERENCES;
   }
@@ -236,6 +255,21 @@ export function saveStoredDeviceUsage(usage: DailyDeviceUsage): void {
   }
 }
 
+export function loadRecentStoredDeviceUsage(endDate: string, dayCount = 7): DailyDeviceUsage[] {
+  if (typeof window === 'undefined' || !Number.isInteger(dayCount) || dayCount < 1) return [];
+  const [year, month, day] = endDate.split('-').map(Number);
+  const cursor = new Date(year, month - 1, day);
+  const snapshots: DailyDeviceUsage[] = [];
+  for (let offset = dayCount - 1; offset >= 0; offset -= 1) {
+    const date = new Date(cursor);
+    date.setDate(date.getDate() - offset);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const usage = loadStoredDeviceUsage(dateKey);
+    if (usage) snapshots.push(usage);
+  }
+  return snapshots;
+}
+
 function loadAllStoredDeviceUsage(): DailyDeviceUsage[] {
   if (typeof window === 'undefined') return [];
   const snapshots: DailyDeviceUsage[] = [];
@@ -280,7 +314,11 @@ export function importDataFromJSON(jsonString: string): { success: boolean; coun
     }
     saveStoredActivities(data.activities);
     if (data.preferences) {
-      saveStoredPreferences({ ...DEFAULT_PREFERENCES, ...data.preferences });
+      const importedPreferences = { ...DEFAULT_PREFERENCES, ...data.preferences };
+      if (!data.preferences.appearanceMode) {
+        importedPreferences.appearanceMode = data.preferences.darkMode === true ? 'dark' : 'light';
+      }
+      saveStoredPreferences(importedPreferences);
     }
     if (data.savingsGoal) {
       saveStoredSavingsGoal(data.savingsGoal);

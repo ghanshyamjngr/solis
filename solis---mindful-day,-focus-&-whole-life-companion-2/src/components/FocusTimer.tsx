@@ -4,6 +4,18 @@ import confetti from 'canvas-confetti';
 import { ActivityCategory, ActivityEntry, UserPreferences } from '../types';
 import { playGentleBell, playCompletionChime } from '../utils/audio';
 import { getTodayDateString } from '../utils/timeline';
+import {
+  EMPTY_FOCUS_TIMER,
+  finishNativeFocusTimer,
+  isNativeFocusTimer,
+  loadFocusTimer,
+  pauseNativeFocusTimer,
+  readNativeFocusTimer,
+  resumeNativeFocusTimer,
+  saveFocusTimer,
+  startNativeFocusTimer,
+} from '../utils/focusTimer';
+import { requestReminderPermission, updateWidgetData } from '../utils/taskReminders';
 
 interface FocusTimerProps {
   preferences: UserPreferences;
@@ -30,13 +42,20 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   const isPlayful = preferences.themeStyle === 'playful-animated';
 
   // Timer states
-  const [mode, setMode] = useState<'preset' | 'open'>('preset');
+  const [mode, setMode] = useState<'preset' | 'open'>(() => loadFocusTimer().mode);
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number>(25);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(25 * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
+    const saved = loadFocusTimer();
+    return Math.max(0, saved.durationSeconds - saved.elapsedSeconds);
+  });
+  const [isRunning, setIsRunning] = useState<boolean>(() => loadFocusTimer().running);
+  const [isPaused, setIsPaused] = useState<boolean>(() => {
+    const saved = loadFocusTimer();
+    return saved.active && !saved.running;
+  });
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(() => loadFocusTimer().elapsedSeconds);
   const [sessionStartTime, setSessionStartTime] = useState<string>('');
+  const [timerError, setTimerError] = useState('');
 
   // Intention & metadata
   const [intention, setIntention] = useState<string>('Deep Work & Writing');
@@ -48,7 +67,8 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
   const [showCompletionModal, setShowCompletionModal] = useState<boolean>(false);
   const [completedDurationMinutes, setCompletedDurationMinutes] = useState<number>(0);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const completionHandled = useRef(false);
+  const initialTimerState = useRef(loadFocusTimer());
 
   // Synchronize initial duration when preset changes (if not running)
   useEffect(() => {
@@ -58,68 +78,209 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     }
   }, [selectedDurationMinutes, mode, isRunning, isPaused]);
 
-  // Main countdown/countup interval
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-
-        if (mode === 'preset') {
-          setRemainingSeconds((prev) => {
-            if (prev <= 1) {
-              clearInterval(timerRef.current!);
-              handleSessionFinish(selectedDurationMinutes);
-              return 0;
-            }
-            return prev - 1;
-          });
+    const saved = initialTimerState.current;
+    if (saved.active) {
+      setMode(saved.mode);
+      setSelectedDurationMinutes(Math.max(1, Math.round(saved.durationSeconds / 60)));
+      setIntention(saved.intention || 'Deep Work & Writing');
+      setSessionStartTime(new Date(saved.startedAt || Date.now()).toTimeString().slice(0, 5));
+    }
+    if (isNativeFocusTimer()) {
+      void readNativeFocusTimer().then((nativeState) => {
+        if (nativeState.active) {
+          saveFocusTimer(nativeState);
+          setMode(nativeState.mode);
+          setSelectedDurationMinutes(Math.max(1, Math.round(nativeState.durationSeconds / 60)));
+          setIntention(nativeState.intention || 'Deep Work & Writing');
+          setElapsedSeconds(nativeState.elapsedSeconds);
+          setRemainingSeconds(Math.max(0, nativeState.durationSeconds - nativeState.elapsedSeconds));
+          setIsRunning(nativeState.running);
+          setIsPaused(!nativeState.running);
+          setSessionStartTime(new Date(nativeState.startedAt || Date.now()).toTimeString().slice(0, 5));
+        } else if (nativeState.completed) {
+          saveFocusTimer(EMPTY_FOCUS_TIMER);
+          completionHandled.current = true;
+          setRemainingSeconds(0);
+          setCompletedDurationMinutes(Math.max(1, Math.round(nativeState.durationSeconds / 60)));
+          setShowCompletionModal(true);
+          setIsRunning(false);
+          setIsPaused(false);
         }
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      }).catch((error) => {
+        console.error('Could not restore Android focus notification state', error);
+        setTimerError('Could not restore the Android focus timer state.');
+      });
     }
+  }, []);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+  useEffect(() => {
+    if (!isRunning && !(isNativeFocusTimer() && isPaused)) return;
+    const tick = () => {
+      if (isNativeFocusTimer()) {
+        void readNativeFocusTimer().then((state) => {
+          if (state.active) {
+            setElapsedSeconds(state.elapsedSeconds);
+            setRemainingSeconds(Math.max(0, state.durationSeconds - state.elapsedSeconds));
+            setIsRunning(state.running);
+            setIsPaused(!state.running);
+            setMode(state.mode);
+            saveFocusTimer(state);
+            if (state.intention) setIntention(state.intention);
+            return;
+          }
+          const previous = loadFocusTimer();
+          const completed = previous.mode === 'preset'
+            && previous.elapsedSeconds >= previous.durationSeconds;
+          saveFocusTimer(EMPTY_FOCUS_TIMER);
+          if ((state.completed || completed) && !completionHandled.current) {
+            completionHandled.current = true;
+            setIsRunning(false);
+            setIsPaused(false);
+            setElapsedSeconds(previous.durationSeconds);
+            setRemainingSeconds(0);
+            handleSessionFinish(Math.max(1, Math.round(previous.durationSeconds / 60)), true);
+          } else if (!completed) {
+            setIsRunning(false);
+            setIsPaused(false);
+          }
+        }).catch((error) => {
+          console.error('Could not synchronize Android focus timer state', error);
+          setTimerError('Could not sync the Android notification timer. Reopen Focus and try again.');
+        });
+        return;
+      }
+
+      const saved = loadFocusTimer();
+      if (!saved.active || !saved.running) return;
+      const elapsed = saved.elapsedSeconds + Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000));
+      setElapsedSeconds(elapsed);
+      if (saved.mode === 'preset') {
+        const remaining = Math.max(0, saved.durationSeconds - elapsed);
+        setRemainingSeconds(remaining);
+        if (remaining === 0 && !completionHandled.current) {
+          completionHandled.current = true;
+          saveFocusTimer({ ...saved, running: false, elapsedSeconds: saved.durationSeconds });
+          setIsRunning(false);
+          setIsPaused(false);
+          handleSessionFinish(Math.max(1, Math.round(saved.durationSeconds / 60)));
+        }
+      }
+      void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
+        .catch((error) => console.error('Could not refresh focus widget data', error));
     };
-  }, [isRunning, mode, selectedDurationMinutes]);
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning, isPaused, mode, selectedDurationMinutes]);
 
-  const handleStart = () => {
-    if (!isRunning && !isPaused) {
-      // Record starting timestamp
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      setSessionStartTime(timeStr);
+  const handleStart = async () => {
+    setTimerError('');
+    completionHandled.current = false;
+    const now = Date.now();
+    const durationSeconds = mode === 'preset' ? selectedDurationMinutes * 60 : 24 * 60 * 60;
+    const next = {
+      active: true,
+      running: true,
+      mode,
+      durationSeconds,
+      elapsedSeconds: 0,
+      intention: intention || 'Focus session',
+      startedAt: now,
+    };
+    saveFocusTimer(next);
+    if (isNativeFocusTimer()) {
+      try {
+        const granted = await requestReminderPermission();
+        if (!granted) throw new Error('Allow notifications to use the ongoing focus timer notification.');
+        await startNativeFocusTimer(
+          next,
+          preferences.soundEnabled,
+          preferences.vibrationEnabled,
+          preferences.quietHoursStart,
+          preferences.quietHoursEnd,
+        );
+      } catch (error) {
+        saveFocusTimer(EMPTY_FOCUS_TIMER);
+        setTimerError(error instanceof Error ? error.message : 'Could not start the Android timer notification.');
+        return;
+      }
     }
+    void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
+      .catch((error) => console.error('Could not refresh focus widget data', error));
+    if (!isPaused) setSessionStartTime(new Date(now).toTimeString().slice(0, 5));
     setIsRunning(true);
     setIsPaused(false);
     playGentleBell(preferences.soundEnabled);
   };
 
-  const handlePause = () => {
+  const handlePause = async () => {
+    const saved = loadFocusTimer();
+    const elapsed = saved.elapsedSeconds + Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000));
+    const paused = { ...saved, running: false, elapsedSeconds: elapsed };
+    saveFocusTimer(paused);
+    if (isNativeFocusTimer()) {
+      try {
+        await pauseNativeFocusTimer();
+      } catch (error) {
+        console.error('Could not pause Android focus timer', error);
+        setTimerError('The notification timer could not be paused.');
+      }
+    }
+    void updateWidgetData({ focus: `Paused · ${intention || 'Focus session'}`, focusAction: 'Tap to resume in Solis' })
+      .catch((error) => console.error('Could not refresh focus widget data', error));
+    setElapsedSeconds(elapsed);
+    setRemainingSeconds(Math.max(0, saved.durationSeconds - elapsed));
     setIsRunning(false);
     setIsPaused(true);
   };
 
-  const handleResume = () => {
+  const handleResume = async () => {
+    const saved = loadFocusTimer();
+    const resumed = { ...saved, running: true, startedAt: Date.now() };
+    saveFocusTimer(resumed);
+    if (isNativeFocusTimer()) {
+      try {
+        await resumeNativeFocusTimer();
+      } catch (error) {
+        console.error('Could not resume Android focus timer', error);
+        setTimerError('The notification timer could not be resumed.');
+        return;
+      }
+    }
+    void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
+      .catch((error) => console.error('Could not refresh focus widget data', error));
     setIsRunning(true);
     setIsPaused(false);
     playGentleBell(preferences.soundEnabled);
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    const saved = loadFocusTimer();
+    const elapsed = saved.running
+      ? saved.elapsedSeconds + Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000))
+      : saved.elapsedSeconds;
+    saveFocusTimer({ ...saved, running: false, elapsedSeconds: elapsed });
+    if (isNativeFocusTimer()) {
+      try {
+        await finishNativeFocusTimer();
+      } catch (error) {
+        console.error('Could not finish Android focus timer', error);
+      }
+    }
     setIsRunning(false);
     setIsPaused(false);
-    const durationMins = Math.max(1, Math.round(elapsedSeconds / 60));
+    setElapsedSeconds(elapsed);
+    const durationMins = Math.max(1, Math.round(elapsed / 60));
     handleSessionFinish(durationMins);
   };
 
-  const handleSessionFinish = (durationMinutes: number) => {
+  const handleSessionFinish = (durationMinutes: number, playAlert = true) => {
     setIsRunning(false);
     setIsPaused(false);
     setCompletedDurationMinutes(durationMinutes);
     setShowCompletionModal(true);
-    playCompletionChime(preferences.soundEnabled);
+    if (playAlert) playCompletionChime(preferences.soundEnabled);
 
     if (isPlayful) {
       confetti({
@@ -136,6 +297,12 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     setIsPaused(false);
     setElapsedSeconds(0);
     setRemainingSeconds(selectedDurationMinutes * 60);
+    saveFocusTimer(EMPTY_FOCUS_TIMER);
+    if (isNativeFocusTimer()) {
+      void finishNativeFocusTimer().catch((error) => console.error('Could not clear Android focus notification', error));
+    }
+    void updateWidgetData({ focus: 'No focus session running', focusAction: 'Tap to start in Solis' })
+      .catch((error) => console.error('Could not refresh focus widget data', error));
   };
 
   const handleSaveCompletedSession = () => {
@@ -183,6 +350,11 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
           <HeartHandshake className="w-3.5 h-3.5" />
           <span>Non-Shaming Focus Space</span>
         </div>
+        {timerError && (
+          <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+            {timerError}
+          </p>
+        )}
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
           Mindful Focus Session
         </h1>

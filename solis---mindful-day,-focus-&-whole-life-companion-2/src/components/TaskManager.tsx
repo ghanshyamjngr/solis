@@ -49,6 +49,13 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   );
   const pendingTask = pendingTaskId ? tasks.find((task) => task.id === pendingTaskId) : undefined;
   const completedCount = scheduledTasks.filter((task) => task.completedDates.includes(selectedDate)).length;
+  const checkedInDates = new Set(tasks.flatMap((task) => task.completedDates));
+  let completionStreak = 0;
+  const streakCursor = new Date(`${today}T12:00:00`);
+  while (checkedInDates.has(`${streakCursor.getFullYear()}-${String(streakCursor.getMonth() + 1).padStart(2, '0')}-${String(streakCursor.getDate()).padStart(2, '0')}`)) {
+    completionStreak += 1;
+    streakCursor.setDate(streakCursor.getDate() - 1);
+  }
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -134,10 +141,17 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">{selectedDate === today ? 'Today’s plan' : `Plan for ${selectedDate}`}</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">{completedCount} of {scheduledTasks.length} complete</p>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{completionStreak}-day task check-in streak</p>
           </div>
           {pendingTaskId && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-              <p className="font-medium">Did you complete “{pendingTask?.title || 'this task'}”?</p>
+              <p className="font-medium">
+                {pendingTask?.checkinResponses?.[selectedDate] === 'skipped'
+                  ? `You marked “${pendingTask?.title || 'this task'}” as skipped. You can still check it off if you did complete it.`
+                  : pendingTask?.checkinResponses?.[selectedDate] === 'postponed'
+                    ? `“${pendingTask?.title || 'this task'}” was postponed. Did you complete it?`
+                    : `Did you complete “${pendingTask?.title || 'this task'}”?`}
+              </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {pendingTask && !pendingTask.completedDates.includes(selectedDate) && (
                   <button type="button" onClick={() => {
@@ -164,7 +178,10 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                   </button>
                   <div className="min-w-0 flex-1">
                     <p className={`truncate text-sm font-semibold ${complete ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{task.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{task.time} · {task.repeat === 'never' ? 'One-time' : task.repeat === 'daily' ? 'Daily' : 'Weekly'} · {task.reminderEnabled ? <Bell className="inline h-3 w-3" /> : <BellOff className="inline h-3 w-3" />}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {task.time} · {task.repeat === 'never' ? 'One-time' : task.repeat === 'daily' ? 'Daily' : 'Weekly'} · {task.reminderEnabled ? <Bell className="inline h-3 w-3" /> : <BellOff className="inline h-3 w-3" />}
+                      {task.skippedDates?.includes(selectedDate) ? ' · Skipped' : ''}
+                    </p>
                   </div>
                   <button type="button" onClick={() => onDeleteTask(task.id)} aria-label={`Delete ${task.title}`} className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"><Trash2 className="h-4 w-4" /></button>
                 </li>

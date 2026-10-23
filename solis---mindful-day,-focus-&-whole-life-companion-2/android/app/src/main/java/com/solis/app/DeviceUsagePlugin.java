@@ -8,9 +8,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.provider.Settings;
+import android.util.Base64;
 
+import java.io.ByteArrayOutputStream;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -29,12 +34,16 @@ public class DeviceUsagePlugin extends Plugin {
 
     private static class AppUsageAggregate {
         final String appName;
+        final String appIconDataUrl;
+        final boolean systemApp;
         long foregroundTimeMs;
         long lastUsedAt;
         int launchCount;
 
-        AppUsageAggregate(String appName) {
+        AppUsageAggregate(String appName, String appIconDataUrl, boolean systemApp) {
             this.appName = appName;
+            this.appIconDataUrl = appIconDataUrl;
+            this.systemApp = systemApp;
         }
     }
 
@@ -98,7 +107,7 @@ public class DeviceUsagePlugin extends Plugin {
                     }
 
                     AppUsageAggregate aggregate = appUsage.computeIfAbsent(
-                        packageName, key -> new AppUsageAggregate(getApplicationLabel(key))
+                        packageName, key -> createAppUsageAggregate(key)
                     );
                     aggregate.foregroundTimeMs += foregroundTime;
                     aggregate.lastUsedAt = Math.max(aggregate.lastUsedAt, usage.getLastTimeUsed());
@@ -119,6 +128,10 @@ public class DeviceUsagePlugin extends Plugin {
                     AppUsageAggregate aggregate = item.getValue();
                     app.put("packageName", item.getKey());
                     app.put("appName", aggregate.appName);
+                    if (aggregate.appIconDataUrl != null) {
+                        app.put("appIconDataUrl", aggregate.appIconDataUrl);
+                    }
+                    app.put("isSystemApp", aggregate.systemApp);
                     app.put("totalTimeInForegroundMs", aggregate.foregroundTimeMs);
                     app.put("lastUsedAt", aggregate.lastUsedAt);
                     app.put("launchCount", aggregate.launchCount);
@@ -169,14 +182,34 @@ public class DeviceUsagePlugin extends Plugin {
         }
     }
 
-    private String getApplicationLabel(String packageName) {
+    private AppUsageAggregate createAppUsageAggregate(String packageName) {
         PackageManager packageManager = getContext().getPackageManager();
+        String label = "Unknown app";
+        boolean systemApp = false;
+        String dataUrl = null;
         try {
             ApplicationInfo info = packageManager.getApplicationInfo(packageName, 0);
-            return packageManager.getApplicationLabel(info).toString();
-        } catch (PackageManager.NameNotFoundException exception) {
-            return packageName;
+            label = packageManager.getApplicationLabel(info).toString();
+            systemApp = (info.flags & (ApplicationInfo.FLAG_SYSTEM
+                | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+        } catch (Exception exception) {
+            return new AppUsageAggregate(label, null, systemApp);
         }
+        try {
+            Drawable icon = packageManager.getApplicationIcon(packageName);
+            Bitmap bitmap = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            icon.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            icon.draw(canvas);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output);
+            bitmap.recycle();
+            dataUrl = "data:image/png;base64,"
+                + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
+        } catch (Exception exception) {
+            // Keep the readable label even if Android cannot supply an app icon.
+        }
+        return new AppUsageAggregate(label, dataUrl, systemApp);
     }
 
     private Map<String, Integer> readAppLaunchCounts(

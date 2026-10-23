@@ -12,10 +12,10 @@ import {
   CheckCircle2,
   Target
 } from 'lucide-react';
-import { AccentColor, DailyDeviceUsage, ThemeStyle, UserPreferences } from '../types';
+import { AccentColor, AppearanceMode, DailyDeviceUsage, ThemeStyle, UserPreferences } from '../types';
 import { exportDataAsJSON, importDataFromJSON, loadStoredTasks, wipeAllLocalData } from '../utils/storage';
 import { isAndroidApp } from '../utils/deviceUsage';
-import { cancelTaskReminder, updateTaskWidget } from '../utils/taskReminders';
+import { cancelTaskReminder, requestReminderPermission, updateTaskWidget } from '../utils/taskReminders';
 
 interface PrivacySettingsProps {
   preferences: UserPreferences;
@@ -23,6 +23,7 @@ interface PrivacySettingsProps {
   onDataReset: () => void;
   deviceUsage: DailyDeviceUsage | null;
   usageStatus: string;
+  encouragementStatus: string;
   onRequestUsageAccess: () => void;
   onSyncDeviceUsage: () => void;
 }
@@ -33,11 +34,91 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
   onDataReset,
   deviceUsage,
   usageStatus,
+  encouragementStatus,
   onRequestUsageAccess,
   onSyncDeviceUsage,
 }) => {
   const [showConfirmWipe, setShowConfirmWipe] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [appearanceFeedback, setAppearanceFeedback] = useState('');
+  const [notificationFeedback, setNotificationFeedback] = useState('');
+  const [appearanceDraft, setAppearanceDraft] = useState({
+    appearanceMode: preferences.appearanceMode,
+    themeStyle: preferences.themeStyle,
+    accentColor: preferences.accentColor,
+  });
+  const [notificationDraft, setNotificationDraft] = useState({
+    quietHoursStart: preferences.quietHoursStart,
+    quietHoursEnd: preferences.quietHoursEnd,
+    soundEnabled: preferences.soundEnabled,
+    vibrationEnabled: preferences.vibrationEnabled,
+    goalCompletionNotificationsEnabled: preferences.goalCompletionNotificationsEnabled,
+    usageEncouragementNotificationsEnabled: preferences.usageEncouragementNotificationsEnabled,
+    usageEncouragementThresholdMinutes: preferences.usageEncouragementThresholdMinutes,
+    usageEncouragementFrequencyDays: preferences.usageEncouragementFrequencyDays,
+    encouragementTone: preferences.encouragementTone,
+    dailyFocusGoalMinutes: preferences.dailyFocusGoalMinutes,
+    dailyOfflineGoalMinutes: preferences.dailyOfflineGoalMinutes,
+  });
+
+  React.useEffect(() => {
+    setAppearanceDraft({
+      appearanceMode: preferences.appearanceMode,
+      themeStyle: preferences.themeStyle,
+      accentColor: preferences.accentColor,
+    });
+  }, [preferences.appearanceMode, preferences.themeStyle, preferences.accentColor]);
+
+  React.useEffect(() => {
+    setNotificationDraft({
+      quietHoursStart: preferences.quietHoursStart,
+      quietHoursEnd: preferences.quietHoursEnd,
+      soundEnabled: preferences.soundEnabled,
+      vibrationEnabled: preferences.vibrationEnabled,
+      goalCompletionNotificationsEnabled: preferences.goalCompletionNotificationsEnabled,
+      usageEncouragementNotificationsEnabled: preferences.usageEncouragementNotificationsEnabled,
+      usageEncouragementThresholdMinutes: preferences.usageEncouragementThresholdMinutes,
+      usageEncouragementFrequencyDays: preferences.usageEncouragementFrequencyDays,
+      encouragementTone: preferences.encouragementTone,
+      dailyFocusGoalMinutes: preferences.dailyFocusGoalMinutes,
+      dailyOfflineGoalMinutes: preferences.dailyOfflineGoalMinutes,
+    });
+  }, [
+    preferences.quietHoursStart,
+    preferences.quietHoursEnd,
+    preferences.soundEnabled,
+    preferences.vibrationEnabled,
+    preferences.goalCompletionNotificationsEnabled,
+    preferences.usageEncouragementNotificationsEnabled,
+    preferences.usageEncouragementThresholdMinutes,
+    preferences.usageEncouragementFrequencyDays,
+    preferences.encouragementTone,
+    preferences.dailyFocusGoalMinutes,
+    preferences.dailyOfflineGoalMinutes,
+  ]);
+
+  const saveAppearance = () => {
+    onUpdatePreferences(appearanceDraft);
+    setAppearanceFeedback('Appearance saved and applied across Solis.');
+  };
+
+  const saveNotificationSettings = async () => {
+    let permissionMessage = '';
+    if (notificationDraft.goalCompletionNotificationsEnabled
+      || (notificationDraft.usageEncouragementNotificationsEnabled && preferences.usageTrackingEnabled)) {
+      try {
+        const granted = await requestReminderPermission();
+        permissionMessage = granted
+          ? 'Android notifications are allowed.'
+          : 'Notifications are not allowed. Enable them in Android settings to receive alerts.';
+      } catch (error) {
+        console.error('Could not request notification permission', error);
+        permissionMessage = 'Notification permission could not be requested.';
+      }
+    }
+    onUpdatePreferences(notificationDraft);
+    setNotificationFeedback(`Reminder and goal settings saved. ${permissionMessage}`.trim());
+  };
 
   const handleExportJSON = () => {
     const jsonStr = exportDataAsJSON();
@@ -113,7 +194,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             Your data stays local by default
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            Activity logs, tasks, notes, and preferences are stored on this device. If you enable Gemini AI sharing, up to four recent days of activity and task follow-through plus your encouragement preference are sent to Solis's existing server for suggestions. The Gemini key remains server-side and is not included in the Android app.
+            Device usage remains on this device unless you enable its separate sharing option below. Activity/task context and device-usage summaries have separate controls; both are off by default for Gemini. The Gemini key remains server-side and is not included in the Android app.
           </p>
         </div>
       </div>
@@ -129,40 +210,76 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
           />
           <div>
             <label htmlFor="ai-data-sharing-consent" className="text-sm font-semibold text-slate-900 dark:text-white">
-              Allow Gemini to use recent activity and task check-ins for personalized suggestions
+              Allow Gemini to use recent activity categories and task check-ins
             </label>
             <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-              Off by default. When enabled, Solis sends up to four recent days of activity categories, titles, notes, durations, planned task titles and completion dates, plus your encouragement preference to the existing Solis server, which forwards them to Gemini. Solis does not send entry IDs, exact times, or device-usage data. This is short-term context, not model training. You can turn this off at any time; local reflections remain available.
+              Off by default. When enabled, Solis sends up to four recent days of activity categories and durations, task titles and completion check-ins, and your accept/edit/dismiss feedback from earlier suggestions to the existing Solis server. Private activity notes, exact event times, and Android device usage are not included by this control. This is temporary context, not model training.
             </p>
             <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Status: {preferences.aiDataSharingConsent ? 'Gemini sharing enabled' : 'No activity is sent to Gemini'}
+              Status: {preferences.aiDataSharingConsent ? 'Activity and task context sharing enabled' : 'Activity and task context stay on this device'}
             </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-4">
+      <section className="rounded-3xl border border-sky-200 bg-sky-50/60 p-6 dark:border-sky-900/60 dark:bg-sky-950/20">
+        <div className="flex items-start gap-3">
+          <input
+            id="ai-usage-data-sharing-consent"
+            type="checkbox"
+            checked={preferences.aiUsageDataSharingConsent}
+            onChange={(event) => onUpdatePreferences({ aiUsageDataSharingConsent: event.target.checked })}
+            className="mt-1 h-4 w-4 accent-sky-600"
+          />
+          <div>
+            <label htmlFor="ai-usage-data-sharing-consent" className="text-sm font-semibold text-slate-900 dark:text-white">
+              Separately allow minimized Android usage totals for Gemini suggestions
+            </label>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              Off by default and independent of activity sharing. If enabled, only up to four dated daily totals for screen-on minutes and foreground-app minutes are sent; app names, package IDs, timelines, websites, and private reflections are excluded. Android usage can show that a browser was used, not what you did inside it.
+            </p>
+            <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              Status: {preferences.aiUsageDataSharingConsent ? 'Minimized usage summary may be shared when synced data exists' : 'Device usage stays on this device'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="appearance-settings" className="scroll-mt-24 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-4">
         <div>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">Appearance</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose a theme that feels comfortable to use.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Appearance mode
+            <select
+              value={appearanceDraft.appearanceMode}
+              onChange={(event) => setAppearanceDraft((current) => ({ ...current, appearanceMode: event.target.value as AppearanceMode }))}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+          <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
             Theme style
             <select
-              value={preferences.themeStyle}
-              onChange={(event) => onUpdatePreferences({ themeStyle: event.target.value as ThemeStyle })}
+              value={appearanceDraft.themeStyle}
+              onChange={(event) => setAppearanceDraft((current) => ({ ...current, themeStyle: event.target.value as ThemeStyle }))}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
             >
               <option value="clean-minimal">Clean minimal</option>
               <option value="playful-animated">Playful</option>
+              <option value="soft-glass">Soft glass</option>
             </select>
           </label>
           <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
             Accent color
             <select
-              value={preferences.accentColor}
-              onChange={(event) => onUpdatePreferences({ accentColor: event.target.value as AccentColor })}
+              value={appearanceDraft.accentColor}
+              onChange={(event) => setAppearanceDraft((current) => ({ ...current, accentColor: event.target.value as AccentColor }))}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
             >
               <option value="amber">Amber</option>
@@ -170,18 +287,21 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               <option value="ocean">Ocean</option>
               <option value="lavender">Lavender</option>
               <option value="coral">Coral</option>
+              <option value="wallpaper">Android wallpaper color</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 self-end pb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <input
-              type="checkbox"
-              checked={preferences.darkMode}
-              onChange={(event) => onUpdatePreferences({ darkMode: event.target.checked })}
-              className="h-4 w-4 accent-amber-600"
-            />
-            Dark appearance
-          </label>
         </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Wallpaper color is read from Android when available; web and unsupported devices use the curated amber fallback.
+        </p>
+        <button
+          type="button"
+          onClick={saveAppearance}
+          className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 dark:bg-white dark:text-slate-900"
+        >
+          Save and apply appearance
+        </button>
+        {appearanceFeedback && <p role="status" className="text-xs text-emerald-700 dark:text-emerald-300">{appearanceFeedback}</p>}
       </section>
 
       <section className="bg-slate-50 dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 space-y-2">
@@ -189,6 +309,19 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
         <p className="text-xs text-slate-600 dark:text-slate-300">Sync: Not configured. Your data remains on this device.</p>
         <p className="text-xs text-slate-600 dark:text-slate-300">Android Usage Access: {isAndroidApp() ? 'Supported by this Android build.' : 'Unavailable in a web browser; open the Android app to use device tracking.'}</p>
         <p className="text-xs text-slate-600 dark:text-slate-300">Task reminders use Android system notifications in the Android app; browser reminders work only while Solis stays open.</p>
+      </section>
+
+      <section className="rounded-3xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-900/60 dark:bg-violet-950/20 space-y-2">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Solis home-screen widgets</h3>
+        {isAndroidApp() ? (
+          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+            This Android build includes Today, Focus, Goals, and Usage widget options. To add one, long-press an empty area of your launcher home screen, choose Widgets, find Solis, then drag the widget onto the screen. Widget content refreshes when Solis data changes and through Android launcher updates; it is not a live second-by-second display.
+          </p>
+        ) : (
+          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+            Native launcher widgets are Android-only and cannot be added from this web version. Install the Solis Android app, then long-press an empty launcher area and choose Widgets to see available Solis widgets.
+          </p>
+        )}
       </section>
 
       <section className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-4">
@@ -309,20 +442,20 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             <div className="flex items-center gap-2">
               <input
                 type="time"
-                value={preferences.quietHoursStart}
-                onChange={(e) => onUpdatePreferences({ quietHoursStart: e.target.value })}
+                value={notificationDraft.quietHoursStart}
+                onChange={(e) => setNotificationDraft((current) => ({ ...current, quietHoursStart: e.target.value }))}
                 className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
               />
               <span className="text-xs text-slate-400">until</span>
               <input
                 type="time"
-                value={preferences.quietHoursEnd}
-                onChange={(e) => onUpdatePreferences({ quietHoursEnd: e.target.value })}
+                value={notificationDraft.quietHoursEnd}
+                onChange={(e) => setNotificationDraft((current) => ({ ...current, quietHoursEnd: e.target.value }))}
                 className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
               />
             </div>
             <span className="text-[11px] text-slate-400 block">
-              Solis task notifications are silent. Quiet hours apply to in-app audio cues.
+              Task check-ins are intentionally silent. Quiet hours mute sound and vibration for focus and goal alerts, while still showing the notification; Android channel and device settings can also silence alerts.
             </span>
           </div>
 
@@ -331,17 +464,116 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               Sound Chimes & Bells
             </label>
             <button
-              onClick={() => onUpdatePreferences({ soundEnabled: !preferences.soundEnabled })}
+              onClick={() => setNotificationDraft((current) => ({ ...current, soundEnabled: !current.soundEnabled }))}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold transition-all ${
-                preferences.soundEnabled
+                notificationDraft.soundEnabled
                   ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-900 dark:text-amber-200'
                   : 'bg-slate-50 dark:bg-slate-900 border-slate-200 text-slate-500'
               }`}
             >
-              {preferences.soundEnabled ? <Volume2 className="w-4 h-4 text-amber-600" /> : <VolumeX className="w-4 h-4" />}
-              {preferences.soundEnabled ? 'Gentle Web Audio Chimes Enabled' : 'Muted (Silent)'}
+              {notificationDraft.soundEnabled ? <Volume2 className="w-4 h-4 text-amber-600" /> : <VolumeX className="w-4 h-4" />}
+              {notificationDraft.soundEnabled ? 'Gentle chimes enabled' : 'Muted (silent)'}
             </button>
           </div>
+
+          <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={notificationDraft.vibrationEnabled}
+              onChange={(event) => setNotificationDraft((current) => ({ ...current, vibrationEnabled: event.target.checked }))}
+              className="mt-0.5"
+            />
+            Vibrate for focus and goal completion alerts (Android)
+          </label>
+
+          <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={notificationDraft.goalCompletionNotificationsEnabled}
+              onChange={(event) => setNotificationDraft((current) => ({ ...current, goalCompletionNotificationsEnabled: event.target.checked }))}
+              className="mt-0.5"
+            />
+            Notify me when a savings goal is reached
+          </label>
+
+          <div className="space-y-2 rounded-xl border border-violet-200 bg-violet-50/60 p-3 dark:border-violet-900 dark:bg-violet-950/20">
+            <label className="flex items-start gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <input
+                type="checkbox"
+                checked={notificationDraft.usageEncouragementNotificationsEnabled}
+                onChange={(event) => setNotificationDraft((current) => ({
+                  ...current,
+                  usageEncouragementNotificationsEnabled: event.target.checked,
+                }))}
+                className="mt-0.5"
+              />
+              Allow optional app-usage check-in notifications (Android)
+            </label>
+            <p className="pl-6 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+              Off by default. Requires Android Usage Access and app-usage tracking to be enabled. Solis checks app-usage totals locally on an Android-managed, inexact schedule, sends at most one message per day, and does not send usage data to Gemini or identify websites. Check-ins are skipped during quiet hours.
+            </p>
+            <label className="block pl-6 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+              Check-in threshold
+              <select
+                value={notificationDraft.usageEncouragementThresholdMinutes}
+                onChange={(event) => setNotificationDraft((current) => ({
+                  ...current,
+                  usageEncouragementThresholdMinutes: Number(event.target.value),
+                }))}
+                className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
+                disabled={!notificationDraft.usageEncouragementNotificationsEnabled}
+              >
+                {[60, 90, 120, 180, 240].map((minutes) => (
+                  <option key={minutes} value={minutes}>{minutes} min app use that day</option>
+                ))}
+              </select>
+            </label>
+            <label className="block pl-6 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+              Maximum frequency
+              <select
+                value={notificationDraft.usageEncouragementFrequencyDays}
+                onChange={(event) => setNotificationDraft((current) => ({
+                  ...current,
+                  usageEncouragementFrequencyDays: event.target.value === '7'
+                    ? 7
+                    : event.target.value === '2' ? 2 : 1,
+                }))}
+                className="ml-2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
+                disabled={!notificationDraft.usageEncouragementNotificationsEnabled}
+              >
+                <option value={1}>At most once a day</option>
+                <option value={2}>At most every other day</option>
+                <option value={7}>At most once a week</option>
+              </select>
+            </label>
+            {notificationDraft.usageEncouragementNotificationsEnabled && !isAndroidApp() && (
+              <p className="pl-6 text-[11px] text-amber-800 dark:text-amber-200">
+                This notification is Android-only. No app-usage monitoring occurs in the web version.
+              </p>
+            )}
+            {notificationDraft.usageEncouragementNotificationsEnabled && isAndroidApp() && (
+              <p role="status" className="pl-6 text-[11px] text-slate-600 dark:text-slate-300">
+                {encouragementStatus || 'Local check-ins need Android Usage Access and notification permission. Android checks periodically and may delay them; they are not instant.'}
+              </p>
+            )}
+          </div>
+
+          <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Encouragement style
+            <select
+              value={notificationDraft.encouragementTone}
+              onChange={(event) => setNotificationDraft((current) => ({
+                ...current,
+                encouragementTone: event.target.value as UserPreferences['encouragementTone'],
+              }))}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+            >
+              <option value="gentle">Gentle</option>
+              <option value="poetic">Poetic</option>
+              <option value="practical">Practical</option>
+              <option value="off">No encouragement</option>
+            </select>
+          </label>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
@@ -352,12 +584,12 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               min="15"
               max="600"
               step="15"
-              value={preferences.dailyFocusGoalMinutes}
-              onChange={(e) => onUpdatePreferences({ dailyFocusGoalMinutes: parseInt(e.target.value) || 60 })}
+              value={notificationDraft.dailyFocusGoalMinutes}
+              onChange={(e) => setNotificationDraft((current) => ({ ...current, dailyFocusGoalMinutes: parseInt(e.target.value) || 60 }))}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
             />
             <span className="text-[11px] text-slate-400 block">
-              Current: {Math.floor(preferences.dailyFocusGoalMinutes / 60)}h {preferences.dailyFocusGoalMinutes % 60}m per day.
+              Current: {Math.floor(notificationDraft.dailyFocusGoalMinutes / 60)}h {notificationDraft.dailyFocusGoalMinutes % 60}m per day.
             </span>
           </div>
 
@@ -370,14 +602,22 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               min="30"
               max="720"
               step="30"
-              value={preferences.dailyOfflineGoalMinutes}
-              onChange={(e) => onUpdatePreferences({ dailyOfflineGoalMinutes: parseInt(e.target.value) || 120 })}
+              value={notificationDraft.dailyOfflineGoalMinutes}
+              onChange={(e) => setNotificationDraft((current) => ({ ...current, dailyOfflineGoalMinutes: parseInt(e.target.value) || 120 }))}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-mono"
             />
             <span className="text-[11px] text-slate-400 block">
-              Current: {Math.floor(preferences.dailyOfflineGoalMinutes / 60)}h {preferences.dailyOfflineGoalMinutes % 60}m screen-free.
+              Current: {Math.floor(notificationDraft.dailyOfflineGoalMinutes / 60)}h {notificationDraft.dailyOfflineGoalMinutes % 60}m screen-free.
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => void saveNotificationSettings()}
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 dark:bg-white dark:text-slate-900"
+          >
+            Save reminder and goal settings
+          </button>
+          {notificationFeedback && <p role="status" className="text-xs text-emerald-700 dark:text-emerald-300">{notificationFeedback}</p>}
         </div>
       </div>
 

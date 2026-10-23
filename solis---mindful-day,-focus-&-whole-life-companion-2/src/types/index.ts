@@ -30,6 +30,8 @@ export interface ActivityEntry {
 export interface TrackedAppUsage {
   packageName: string;
   appName: string;
+  appIconDataUrl?: string;
+  isSystemApp?: boolean;
   totalTimeInForegroundMs: number;
   lastUsedAt: number;
   launchCount: number;
@@ -59,23 +61,33 @@ export interface PlannedTask {
   repeat: TaskRepeat;
   reminderEnabled: boolean;
   completedDates: string[];
+  skippedDates?: string[];
+  checkinResponses?: Record<string, 'completed' | 'postponed' | 'skipped'>;
   createdAt: number;
 }
 
-export type ThemeStyle = 'clean-minimal' | 'playful-animated';
-export type AccentColor = 'amber' | 'sage' | 'ocean' | 'lavender' | 'coral';
+export type ThemeStyle = 'clean-minimal' | 'playful-animated' | 'soft-glass';
+export type AccentColor = 'amber' | 'sage' | 'ocean' | 'lavender' | 'coral' | 'wallpaper';
+export type AppearanceMode = 'system' | 'light' | 'dark';
 
 export interface UserPreferences {
   themeStyle: ThemeStyle;
   accentColor: AccentColor;
+  appearanceMode: AppearanceMode;
   darkMode: boolean;
   soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  goalCompletionNotificationsEnabled: boolean;
+  usageEncouragementNotificationsEnabled: boolean;
+  usageEncouragementThresholdMinutes: number;
+  usageEncouragementFrequencyDays: 1 | 2 | 7;
   quietHoursStart: string; // '22:00'
   quietHoursEnd: string;   // '07:00'
   encouragementTone: 'gentle' | 'poetic' | 'practical' | 'off';
   dailyFocusGoalMinutes: number;
   dailyOfflineGoalMinutes: number;
   aiDataSharingConsent: boolean;
+  aiUsageDataSharingConsent: boolean;
   usageTrackingEnabled: boolean;
 }
 

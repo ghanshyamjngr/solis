@@ -42,7 +42,7 @@ const ai = process.env.GEMINI_API_KEY
 // Server-side Gemini AI Insights route
 app.post('/api/ai-insights', async (req, res) => {
   try {
-    const { activities, tasks, preferences, selectedDate } = req.body;
+    const { activities, tasks, deviceUsageSummary, suggestionFeedback, preferences, selectedDate } = req.body;
 
     if (!ai) {
       return res.status(200).json({
@@ -52,26 +52,55 @@ app.post('/api/ai-insights', async (req, res) => {
     }
 
     const activitySummaryText = (activities || [])
-      .map((a: any) => `- ${a.date || selectedDate} [${a.category}] "${a.title}": ${a.durationMinutes} mins (${a.notes || 'no notes'})`)
+      .map((a: any) => `- ${a.date || selectedDate} [${a.category}] ${a.durationMinutes} mins`)
       .join('\n');
 
     const taskSummaryText = (tasks || [])
       .map((task: any) => `- ${task.date}: "${task.title}" (${task.repeat || 'one-time'}; ${task.completed ? 'completed' : 'not marked complete'})`)
       .join('\n');
+    const safeUsageSummary = Array.isArray(deviceUsageSummary)
+      ? deviceUsageSummary.slice(-4).filter((day: any) => day
+        && /^\d{4}-\d{2}-\d{2}$/.test(day.date)
+        && Number.isFinite(day.screenOnMinutes)
+        && Number.isFinite(day.foregroundAppMinutes))
+        .map((day: any) => ({
+          date: day.date,
+          screenOnMinutes: Math.max(0, Math.min(1440, Math.round(day.screenOnMinutes))),
+          foregroundAppMinutes: Math.max(0, Math.min(1440, Math.round(day.foregroundAppMinutes))),
+        }))
+      : [];
+    const deviceUsageSummaryText = safeUsageSummary
+      .map((day: any) => `- ${day.date}: ${day.screenOnMinutes} screen-on minutes; ${day.foregroundAppMinutes} foreground-app minutes`)
+      .join('\n');
+    const safeSuggestionFeedback = Array.isArray(suggestionFeedback)
+      ? suggestionFeedback.slice(-3).filter((item: any) => item
+        && /^\d{4}-\d{2}-\d{2}$/.test(item.date)
+        && ['accepted', 'dismissed', 'not-useful', 'edited'].includes(item.action))
+        .map((item: any) => `- ${item.date}: user marked a previous suggestion as ${item.action}`)
+        .join('\n')
+      : '';
 
     const prompt = `You are Solis, a gentle, privacy-minded life companion. This is a personalized suggestion based on a short recent history, not model training.
 Analyze the user's recent four-day activity and task follow-through through ${selectedDate}:
 ${activitySummaryText || 'No activities recorded yet for today.'}
 
-Planned tasks and completion check-ins:
+Minimized device-usage summary, only if the user separately enabled sharing:
+${deviceUsageSummaryText || 'No device-usage summary was shared.'}
+
+Planned tasks and explicit completion check-ins:
 ${taskSummaryText || 'No planned tasks were provided.'}
+
+Recent suggestion feedback, if separately enabled activity/task personalization includes it:
+${safeSuggestionFeedback || 'No prior suggestion feedback was shared.'}
 
 Guiding principles:
 1. NEVER shame, guilt-trip, or judge the user.
 2. Value sleep, meals, outdoor walks, and offline time equally to screen-based focus.
 3. Observe only real facts.
-4. Notice realistic patterns across days and suggest one specific next action, but do not invent facts or pressure the user.
-5. Tone: ${preferences?.encouragementTone || 'gentle'}.
+4. Device-usage totals show time only. Never infer studying, touch interaction, task completion, websites visited, or what happened inside an app from usage totals.
+5. Notice realistic patterns across days and suggest one specific next action, but do not invent facts or pressure the user.
+6. Tone: ${preferences?.encouragementTone || 'gentle'}.
+7. Use shared accept/edit/dismiss feedback to adjust future suggestions, without treating dismissal as a negative judgment of the user.
 
 Provide a JSON object response with:
 - summary: A 1-2 sentence warm, realistic overview of how the day was woven.

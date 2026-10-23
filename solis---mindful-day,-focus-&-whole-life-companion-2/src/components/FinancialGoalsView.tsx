@@ -5,6 +5,7 @@ import { FinancialEntry, LoanEntry, SavingsGoal, UserPreferences } from '../type
 import { getTodayDateString } from '../utils/timeline';
 
 interface FinancialGoalsViewProps {
+  statusMessage: string;
   savingsGoal: SavingsGoal;
   financialEntries: FinancialEntry[];
   loans: LoanEntry[];
@@ -16,6 +17,7 @@ interface FinancialGoalsViewProps {
 }
 
 export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
+  statusMessage,
   savingsGoal,
   financialEntries,
   loans,
@@ -30,6 +32,7 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
   const [note, setNote] = useState<string>('Home-cooked meal instead of ordering delivery');
   const [type, setType] = useState<'saved' | 'spent_mindfully' | 'impulse_avoided'>('saved');
   const [goalAmount, setGoalAmount] = useState<number>(savingsGoal.targetAmount);
+  const [goalSavedAmount, setGoalSavedAmount] = useState<number>(savingsGoal.currentAmount);
   const [goalTitle, setGoalTitle] = useState<string>(savingsGoal.title);
   const [goalCurrency, setGoalCurrency] = useState(savingsGoal.currency || 'USD');
   const [isEditingGoal, setIsEditingGoal] = useState<boolean>(false);
@@ -80,6 +83,7 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
       ...savingsGoal,
       title: goalTitle,
       targetAmount: goalAmount,
+      currentAmount: goalSavedAmount,
       currency: goalCurrency,
     });
     setIsEditingGoal(false);
@@ -125,6 +129,11 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
           Notice how your daily choices connect to your aspirations. Completely private, on-device, and free of bank credentials.
         </p>
       </div>
+      {statusMessage && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+          {statusMessage}
+        </p>
+      )}
 
       {/* Main Savings Target Card */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-6">
@@ -147,6 +156,12 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
                 if (isEditingGoal) {
                   setGoalTitle(savingsGoal.title);
                   setGoalAmount(savingsGoal.targetAmount);
+                  setGoalSavedAmount(savingsGoal.currentAmount);
+                  setGoalCurrency(currency);
+                } else {
+                  setGoalTitle(savingsGoal.title);
+                  setGoalAmount(savingsGoal.targetAmount);
+                  setGoalSavedAmount(savingsGoal.currentAmount);
                   setGoalCurrency(currency);
                 }
                 setIsEditingGoal(!isEditingGoal);
@@ -187,6 +202,17 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
                   step="0.01"
                   value={goalAmount}
                   onChange={(e) => setGoalAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 block mb-1">Amount Already Saved</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={goalSavedAmount}
+                  onChange={(e) => setGoalSavedAmount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white font-mono"
                 />
               </div>

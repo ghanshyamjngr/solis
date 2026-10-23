@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Clock,
   Sparkles,
@@ -36,6 +36,8 @@ interface DailyTimelineProps {
   deviceUsage: DailyDeviceUsage | null;
   usageTrackingEnabled: boolean;
   usageStatus: string;
+  isUsageRefreshing: boolean;
+  onRefreshUsage: () => void;
   preferences: UserPreferences;
   onDeleteEntry: (id: string) => void;
   onNavigateToLog: () => void;
@@ -49,6 +51,8 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
   deviceUsage,
   usageTrackingEnabled,
   usageStatus,
+  isUsageRefreshing,
+  onRefreshUsage,
   preferences,
   onDeleteEntry,
   onNavigateToLog,
@@ -56,6 +60,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const pullStart = useRef<{ x: number; y: number } | null>(null);
 
   const dayEntries = entries.filter((e) => e.date === date);
   const sortedEntries = sortEntriesChronologically(dayEntries);
@@ -99,7 +104,27 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-4">
+    <div
+      className="max-w-4xl mx-auto space-y-8 py-4"
+      onTouchStart={(event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest('button, input, select, textarea, [role="slider"]')) {
+          pullStart.current = null;
+          return;
+        }
+        const touch = event.touches[0];
+        pullStart.current = window.scrollY <= 0 && touch ? { x: touch.clientX, y: touch.clientY } : null;
+      }}
+      onTouchEnd={(event) => {
+        const start = pullStart.current;
+        pullStart.current = null;
+        const touch = event.changedTouches[0];
+        if (!start || !touch || window.scrollY > 0) return;
+        const deltaY = touch.clientY - start.y;
+        const deltaX = Math.abs(touch.clientX - start.x);
+        if (deltaY >= 72 && deltaX < 64 && !isUsageRefreshing) onRefreshUsage();
+      }}
+    >
       {/* Daily Insights Component: Total focus time, activity breakdown, and AI reflections */}
       <DailyInsights
         entries={entries.filter((entry) => entry.source !== 'demo')}
@@ -107,6 +132,8 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
         deviceUsage={deviceUsage}
         usageTrackingEnabled={usageTrackingEnabled}
         usageStatus={usageStatus}
+        isUsageRefreshing={isUsageRefreshing}
+        onRefreshUsage={onRefreshUsage}
         selectedDate={date}
         preferences={preferences}
         onStartFocus={onNavigateToTimer}
