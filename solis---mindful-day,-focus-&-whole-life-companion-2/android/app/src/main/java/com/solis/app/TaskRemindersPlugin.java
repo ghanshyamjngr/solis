@@ -346,7 +346,7 @@ public class TaskRemindersPlugin extends Plugin {
         scheduleAlarm(context, taskId + "-postpone", taskId, title, body, at, "never");
     }
 
-    private static void scheduleAlarm(Context context, String id, String taskId,
+    static void scheduleAlarm(Context context, String id, String taskId,
         String title, String body, long at, String repeat) {
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) throw new IllegalStateException("Android alarm service is unavailable.");
