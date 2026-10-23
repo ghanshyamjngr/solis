@@ -25,6 +25,8 @@ import java.util.Map;
 
 @CapacitorPlugin(name = "DeviceUsage")
 public class DeviceUsagePlugin extends Plugin {
+    private static final long APP_LAUNCH_DEDUPLICATION_MS = 10_000L;
+
     private static class AppUsageAggregate {
         final String appName;
         long foregroundTimeMs;
@@ -100,9 +102,14 @@ public class DeviceUsagePlugin extends Plugin {
                     );
                     aggregate.foregroundTimeMs += foregroundTime;
                     aggregate.lastUsedAt = Math.max(aggregate.lastUsedAt, usage.getLastTimeUsed());
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        aggregate.launchCount += usage.getAppLaunchCount();
-                    }
+                }
+            }
+
+            Map<String, Integer> launchCounts = readAppLaunchCounts(manager, range[0], range[1]);
+            for (Map.Entry<String, AppUsageAggregate> item : appUsage.entrySet()) {
+                Integer launchCount = launchCounts.get(item.getKey());
+                if (launchCount != null) {
+                    item.getValue().launchCount = launchCount;
                 }
             }
 
@@ -170,6 +177,36 @@ public class DeviceUsagePlugin extends Plugin {
         } catch (PackageManager.NameNotFoundException exception) {
             return packageName;
         }
+    }
+
+    private Map<String, Integer> readAppLaunchCounts(
+        UsageStatsManager manager, long startMs, long endMs
+    ) {
+        Map<String, Integer> launchCounts = new HashMap<>();
+        Map<String, Long> lastCountedAt = new HashMap<>();
+        UsageEvents events = manager.queryEvents(startMs, endMs);
+        UsageEvents.Event event = new UsageEvents.Event();
+        int foregroundEventType = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+            ? UsageEvents.Event.ACTIVITY_RESUMED
+            : UsageEvents.Event.MOVE_TO_FOREGROUND;
+
+        while (events != null && events.hasNextEvent()) {
+            events.getNextEvent(event);
+            if (event.getEventType() != foregroundEventType) {
+                continue;
+            }
+
+            String packageName = event.getPackageName();
+            long timestamp = event.getTimeStamp();
+            Long previousTimestamp = lastCountedAt.get(packageName);
+            if (previousTimestamp == null
+                || timestamp - previousTimestamp >= APP_LAUNCH_DEDUPLICATION_MS) {
+                Integer count = launchCounts.get(packageName);
+                launchCounts.put(packageName, count == null ? 1 : count + 1);
+                lastCountedAt.put(packageName, timestamp);
+            }
+        }
+        return launchCounts;
     }
 
     private JSObject readScreenEvents(UsageStatsManager manager, long startMs, long endMs) {
