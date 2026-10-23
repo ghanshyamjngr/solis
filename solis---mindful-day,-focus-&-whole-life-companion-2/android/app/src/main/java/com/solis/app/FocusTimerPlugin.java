@@ -3,6 +3,7 @@ package com.solis.app;
 import android.Manifest;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Bundle;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -75,7 +76,17 @@ public class FocusTimerPlugin extends Plugin {
 
     @PluginMethod
     public void getState(PluginCall call) {
-        call.resolve(FocusTimerService.readState(getContext()));
+        Bundle state = FocusTimerService.readState(getContext());
+        JSObject result = new JSObject();
+        result.put("active", state.getBoolean("active"));
+        result.put("running", state.getBoolean("running"));
+        result.put("mode", state.getString("mode"));
+        result.put("durationSeconds", state.getInt("durationSeconds"));
+        result.put("elapsedSeconds", state.getLong("elapsedSeconds"));
+        result.put("intention", state.getString("intention"));
+        result.put("startedAt", state.getLong("startedAt"));
+        result.put("completed", state.getBoolean("completed"));
+        call.resolve(result);
     }
 
     private void sendAction(String action, PluginCall call) {

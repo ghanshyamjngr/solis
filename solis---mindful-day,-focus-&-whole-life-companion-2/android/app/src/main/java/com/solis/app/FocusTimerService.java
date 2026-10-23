@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -321,9 +322,9 @@ public class FocusTimerService extends Service {
         manager.notify(NOTIFICATION_ID + 1, builder.build());
     }
 
-    static JSObject readState(Context context) {
+    static Bundle readState(Context context) {
         android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        JSObject state = new JSObject();
+        Bundle state = new Bundle();
         boolean active = prefs.getBoolean("active", false);
         boolean running = prefs.getBoolean("running", false);
         long elapsed = prefs.getLong("elapsed", 0);
@@ -332,15 +333,15 @@ public class FocusTimerService extends Service {
             if (delta < 0) delta = Math.max(0, System.currentTimeMillis() - prefs.getLong("anchorWall", 0));
             elapsed += delta / 1000;
         }
-        state.put("active", active);
-        state.put("running", running);
-        state.put("mode", prefs.getBoolean("preset", true) ? "preset" : "open");
-        state.put("durationSeconds", prefs.getInt("duration", 1500));
-        state.put("elapsedSeconds", elapsed);
-        state.put("intention", prefs.getString("intention", ""));
-        state.put("startedAt", prefs.getLong("anchorWall", 0));
+        state.putBoolean("active", active);
+        state.putBoolean("running", running);
+        state.putString("mode", prefs.getBoolean("preset", true) ? "preset" : "open");
+        state.putInt("durationSeconds", prefs.getInt("duration", 1500));
+        state.putLong("elapsedSeconds", elapsed);
+        state.putString("intention", prefs.getString("intention", ""));
+        state.putLong("startedAt", prefs.getLong("anchorWall", 0));
         boolean completed = prefs.getBoolean("completed", false);
-        state.put("completed", completed);
+        state.putBoolean("completed", completed);
         if (completed) prefs.edit().remove("completed").apply();
         return state;
     }
