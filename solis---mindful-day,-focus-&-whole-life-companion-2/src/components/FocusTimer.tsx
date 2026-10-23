@@ -145,6 +145,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
     const newEntry: ActivityEntry = {
       id: `focus-${Date.now()}`,
+      source: 'manual',
       category: category,
       title: intention || 'Mindful Focus Session',
       startTime: startTimeStr,

@@ -26,6 +26,8 @@ The Android app packages the existing Vite web app in a Capacitor WebView. Gemin
 requests continue to go to the existing server-side `/api/ai-insights` endpoint;
 the Gemini API key must remain configured on that server and must never be
 included in the Android app or its build settings.
+Android builds require JDK 21 and Android SDK platform 36 with build-tools 36.0.0.
+The repository's APK workflow provisions these tools automatically.
 
 Deploy the existing server with the `https://localhost` origin allowed for its
 `/api` endpoints, then install dependencies and build/sync the Android assets
@@ -52,3 +54,51 @@ The debug APK is written to
 the API origin must be reachable over HTTPS from the device. Without the
 configured API origin, the app still opens and uses its existing local
 reflection fallback, but Gemini insights will not be reachable.
+
+### Optional Android app-usage tracking
+
+In Solis Settings, choose **Enable tracking and open Usage Access**, then grant
+Solis access in Android's Usage Access settings. Solis reads Android
+`UsageStatsManager` foreground-app totals and screen-on/keyguard events. Android
+records usage while Solis is closed or another app is in front; Solis syncs the
+OS report when the app is opened or returns to the foreground. The report is
+stored locally and kept separate from manually logged activities and Gemini
+requests. Turning tracking off stops future reads without deleting saved
+snapshots; use the existing data wipe control to remove local records.
+
+This is app-level usage, not touch-by-touch interaction or website history.
+Browser usage only identifies the browser app. Exact site tracking would need a
+separate browser-specific extension/integration, which is not included.
+Usage Access is an Android system setting, not a runtime permission prompt.
+
+### Tasks, reminders, and the home-screen widget
+
+Use the **Tasks** tab to create one-time, daily, or weekly intentions, choose a
+preferred time, and optionally enable a reminder. Android task reminders use
+local system notifications and are restored after device restart. Tapping a
+reminder opens a check-in so you can mark the task done; repeat reminders move
+to the next occurrence after a check-in. Android's idle/battery and notification
+settings may delay or suppress delivery; these alarms are not guaranteed to the
+exact minute. In a web browser,
+reminders use the Notifications API and can only fire while Solis remains open.
+
+Add the **Solis** widget from Android's home-screen widget picker. It shows the
+next planned task and today's completion count, and opens the Tasks tab. The
+widget updates when Solis is opened and when a task is changed.
+
+### Savings currency and lending records
+
+Savings goals support selectable currencies and format amounts using the
+device's locale. A goal's currency cannot be changed while it has a balance;
+Solis does not silently convert funds. The Money tab also stores explicitly
+confirmed lending and borrowing records, due dates, and manual settlement
+status. These are private local notes, not bank integrations, payment
+instructions, or legal verification.
+
+### Personalized suggestions and privacy
+
+Gemini sharing remains off by default. If enabled, Solis can send up to four
+recent days of manually logged activity and planned-task completion check-ins
+to its existing server for suggestions. Android device-usage snapshots are
+excluded. This is short-term context, not model training. The Gemini key stays
+on the server and is never embedded in the APK.

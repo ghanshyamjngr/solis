@@ -1,5 +1,5 @@
-import { ActivityEntry, DailyHabits, FinancialEntry, SavingsGoal, UserPreferences } from '../types';
-import { generateSeedEntries, getTodayDateString } from './timeline';
+import { ActivityEntry, DailyDeviceUsage, DailyHabits, FinancialEntry, LoanEntry, PlannedTask, SavingsGoal, UserPreferences } from '../types';
+import { getTodayDateString } from './timeline';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'solis_activity_entries_v1',
@@ -7,6 +7,9 @@ const STORAGE_KEYS = {
   HABITS: 'solis_daily_habits_v1',
   SAVINGS_GOAL: 'solis_savings_goal_v1',
   FINANCES: 'solis_financial_entries_v1',
+  TASKS: 'solis_planned_tasks_v1',
+  LOANS: 'solis_loan_entries_v1',
+  DEVICE_USAGE_PREFIX: 'solis_android_usage_v1_',
 };
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
@@ -19,28 +22,94 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   encouragementTone: 'gentle',
   dailyFocusGoalMinutes: 120,
   dailyOfflineGoalMinutes: 180,
+  aiDataSharingConsent: false,
+  usageTrackingEnabled: false,
 };
 
 export const DEFAULT_SAVINGS_GOAL: SavingsGoal = {
   id: 'goal-default',
-  title: 'Mindful Sanctuary / Quiet Desk Workspace',
-  targetAmount: 850,
-  currentAmount: 420,
-  category: 'Environment',
-  targetDate: '2026-12-31',
+  title: 'Add a savings goal',
+  targetAmount: 0,
+  currentAmount: 0,
+  category: 'Personal',
+  currency: 'USD',
 };
+
+export function loadStoredTasks(): PlannedTask[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.TASKS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    const valid = parsed.filter((task) => task
+      && typeof task.id === 'string'
+      && typeof task.title === 'string'
+      && typeof task.date === 'string'
+      && typeof task.time === 'string');
+    if (valid.length !== parsed.length) {
+      console.warn(`Ignored ${parsed.length - valid.length} invalid planned task record(s).`);
+    }
+    return valid.map((task) => ({
+      id: task.id,
+      title: task.title,
+      date: task.date,
+      time: task.time,
+      repeat: ['daily', 'weekly'].includes(task.repeat) ? task.repeat : 'never',
+      reminderEnabled: task.reminderEnabled === true,
+      completedDates: Array.isArray(task.completedDates)
+        ? task.completedDates.filter((date: unknown): date is string => typeof date === 'string')
+        : [],
+      createdAt: Number.isFinite(task.createdAt) ? task.createdAt : Date.now(),
+    }));
+  } catch (error) {
+    console.error('Failed to load planned tasks from localStorage', error);
+    return [];
+  }
+}
+
+export function saveStoredTasks(tasks: PlannedTask[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+  } catch (error) {
+    console.error('Failed to save planned tasks to localStorage', error);
+  }
+}
+
+export function loadStoredLoans(): LoanEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.LOANS);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Failed to load lending records from localStorage', error);
+    return [];
+  }
+}
+
+export function saveStoredLoans(loans: LoanEntry[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.LOANS, JSON.stringify(loans));
+  } catch (error) {
+    console.error('Failed to save lending records to localStorage', error);
+  }
+}
 
 export function loadStoredActivities(): ActivityEntry[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.ACTIVITIES);
-    if (!raw) {
-      const seed = generateSeedEntries();
-      saveStoredActivities(seed);
-      return seed;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.map((entry) =>
+          /^seed-[1-6]$/.test(entry.id) && !entry.source
+            ? { ...entry, source: 'demo' as const }
+            : entry
+        )
+      : [];
   } catch (err) {
     console.error('Failed to load activities from localStorage', err);
     return [];
@@ -78,18 +147,16 @@ export function saveStoredPreferences(prefs: UserPreferences): void {
 
 export function loadStoredHabits(date = getTodayDateString()): DailyHabits {
   if (typeof window === 'undefined') {
-    return { date, waterGlasses: 4, waterTarget: 8, mindfulBreaksCount: 2, impulseFreeDay: true };
+    return { date, waterGlasses: 0, waterTarget: 8, mindfulBreaksCount: 0, impulseFreeDay: false };
   }
   try {
     const raw = localStorage.getItem(`${STORAGE_KEYS.HABITS}_${date}`);
     if (!raw) {
-      const def: DailyHabits = { date, waterGlasses: 4, waterTarget: 8, mindfulBreaksCount: 2, impulseFreeDay: true };
-      saveStoredHabits(def);
-      return def;
+      return { date, waterGlasses: 0, waterTarget: 8, mindfulBreaksCount: 0, impulseFreeDay: false };
     }
     return JSON.parse(raw);
   } catch {
-    return { date, waterGlasses: 4, waterTarget: 8, mindfulBreaksCount: 2, impulseFreeDay: true };
+    return { date, waterGlasses: 0, waterTarget: 8, mindfulBreaksCount: 0, impulseFreeDay: false };
   }
 }
 
@@ -126,15 +193,15 @@ export function loadStoredFinancialEntries(): FinancialEntry[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.FINANCES);
-    if (!raw) {
-      const seeds: FinancialEntry[] = [
-        { id: 'fin-1', date: getTodayDateString(), amountSaved: 18, note: 'Home-cooked lunch instead of takeaway', type: 'saved', createdAt: Date.now() - 100000 },
-        { id: 'fin-2', date: getTodayDateString(), amountSaved: 35, note: 'Resisted online impulse shopping cart', type: 'impulse_avoided', createdAt: Date.now() - 50000 },
-      ];
-      saveStoredFinancialEntries(seeds);
-      return seeds;
-    }
-    return JSON.parse(raw);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map((entry) =>
+          ['fin-1', 'fin-2'].includes(entry.id) && !entry.source
+            ? { ...entry, source: 'demo' as const }
+            : entry
+        )
+      : [];
   } catch {
     return [];
   }
@@ -149,6 +216,39 @@ export function saveStoredFinancialEntries(entries: FinancialEntry[]): void {
   }
 }
 
+export function loadStoredDeviceUsage(date = getTodayDateString()): DailyDeviceUsage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEYS.DEVICE_USAGE_PREFIX}${date}`);
+    return raw ? JSON.parse(raw) as DailyDeviceUsage : null;
+  } catch (err) {
+    console.error('Failed to load Android usage data from localStorage', err);
+    return null;
+  }
+}
+
+export function saveStoredDeviceUsage(usage: DailyDeviceUsage): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(`${STORAGE_KEYS.DEVICE_USAGE_PREFIX}${usage.date}`, JSON.stringify(usage));
+  } catch (err) {
+    console.error('Failed to save Android usage data to localStorage', err);
+  }
+}
+
+function loadAllStoredDeviceUsage(): DailyDeviceUsage[] {
+  if (typeof window === 'undefined') return [];
+  const snapshots: DailyDeviceUsage[] = [];
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(STORAGE_KEYS.DEVICE_USAGE_PREFIX)) continue;
+    const date = key.slice(STORAGE_KEYS.DEVICE_USAGE_PREFIX.length);
+    const snapshot = loadStoredDeviceUsage(date);
+    if (snapshot) snapshots.push(snapshot);
+  }
+  return snapshots;
+}
+
 export function exportDataAsJSON(): string {
   const activities = loadStoredActivities();
   const preferences = loadStoredPreferences();
@@ -159,11 +259,14 @@ export function exportDataAsJSON(): string {
   const exportPayload = {
     version: '1.2.0',
     exportedAt: new Date().toISOString(),
-    privacyNotice: 'All data was stored strictly locally on your device.',
+    privacyNotice: 'This backup contains data stored locally on this device. If Gemini sharing was enabled, previously transmitted data is not recalled by exporting or changing this setting.',
     activities,
     preferences,
     savingsGoal,
     financialEntries,
+    tasks: loadStoredTasks(),
+    loans: loadStoredLoans(),
+    deviceUsage: loadAllStoredDeviceUsage(),
     todayHabits,
   };
   return JSON.stringify(exportPayload, null, 2);
@@ -185,6 +288,15 @@ export function importDataFromJSON(jsonString: string): { success: boolean; coun
     if (Array.isArray(data.financialEntries)) {
       saveStoredFinancialEntries(data.financialEntries);
     }
+    if (Array.isArray(data.tasks)) {
+      saveStoredTasks(data.tasks);
+    }
+    if (Array.isArray(data.loans)) {
+      saveStoredLoans(data.loans);
+    }
+    if (Array.isArray(data.deviceUsage)) {
+      data.deviceUsage.forEach((usage: DailyDeviceUsage) => saveStoredDeviceUsage(usage));
+    }
     return { success: true, count: data.activities.length };
   } catch (e: unknown) {
     return { success: false, error: (e as Error).message || 'Failed to parse JSON file' };
@@ -197,4 +309,12 @@ export function wipeAllLocalData(): void {
   localStorage.removeItem(STORAGE_KEYS.PREFERENCES);
   localStorage.removeItem(STORAGE_KEYS.SAVINGS_GOAL);
   localStorage.removeItem(STORAGE_KEYS.FINANCES);
+  localStorage.removeItem(STORAGE_KEYS.TASKS);
+  localStorage.removeItem(STORAGE_KEYS.LOANS);
+  for (let index = localStorage.length - 1; index >= 0; index--) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(STORAGE_KEYS.DEVICE_USAGE_PREFIX) || key?.startsWith(`${STORAGE_KEYS.HABITS}_`)) {
+      localStorage.removeItem(key);
+    }
+  }
 }

@@ -12,19 +12,29 @@ import {
   CheckCircle2,
   Target
 } from 'lucide-react';
-import { UserPreferences } from '../types';
-import { exportDataAsJSON, importDataFromJSON, wipeAllLocalData } from '../utils/storage';
+import { AccentColor, DailyDeviceUsage, ThemeStyle, UserPreferences } from '../types';
+import { exportDataAsJSON, importDataFromJSON, loadStoredTasks, wipeAllLocalData } from '../utils/storage';
+import { isAndroidApp } from '../utils/deviceUsage';
+import { cancelTaskReminder, updateTaskWidget } from '../utils/taskReminders';
 
 interface PrivacySettingsProps {
   preferences: UserPreferences;
   onUpdatePreferences: (updates: Partial<UserPreferences>) => void;
   onDataReset: () => void;
+  deviceUsage: DailyDeviceUsage | null;
+  usageStatus: string;
+  onRequestUsageAccess: () => void;
+  onSyncDeviceUsage: () => void;
 }
 
 export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
   preferences,
   onUpdatePreferences,
   onDataReset,
+  deviceUsage,
+  usageStatus,
+  onRequestUsageAccess,
+  onSyncDeviceUsage,
 }) => {
   const [showConfirmWipe, setShowConfirmWipe] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -61,10 +71,24 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
     reader.readAsText(file);
   };
 
-  const handleWipe = () => {
+  const handleWipe = async () => {
+    const reminderIds = loadStoredTasks().map((task) => task.id);
+    const cancellations = await Promise.allSettled(reminderIds.map((id) => cancelTaskReminder(id)));
+    const widgetUpdate = updateTaskWidget([], new Date().toISOString().slice(0, 10));
     wipeAllLocalData();
     setShowConfirmWipe(false);
     onDataReset();
+    const failed = cancellations.filter((result) => result.status === 'rejected').length;
+    try {
+      await widgetUpdate;
+    } catch (error) {
+      console.error('Could not clear the Solis widget after erasing local data', error);
+    }
+    if (failed) {
+      console.error(`${failed} task reminder(s) could not be cancelled while erasing local data.`);
+      setImportStatus('Local data was erased, but one or more system reminders could not be cancelled. Check Android notification settings.');
+      setTimeout(() => setImportStatus(null), 6000);
+    }
   };
 
   return (
@@ -75,24 +99,149 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
           Privacy, Storage & Preferences
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-          Your data belongs exclusively to you. No tracking pixels, no servers, no third-party analytics.
+          Your activity stays on this device unless you explicitly enable Gemini AI sharing below.
         </p>
       </div>
 
-      {/* On-Device Guarantee Card */}
+      {/* Data and AI sharing status */}
       <div className="p-6 rounded-3xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
           <ShieldCheck className="w-6 h-6" />
         </div>
         <div className="space-y-1">
           <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            100% On-Device Privacy Architecture
+            Your data stays local by default
           </h3>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-            All focus logs, sleep times, meal notes, and reflections are held inside your browser’s local storage. Not a single byte is transmitted to any cloud database, advertising network, or external server.
+            Activity logs, tasks, notes, and preferences are stored on this device. If you enable Gemini AI sharing, up to four recent days of activity and task follow-through plus your encouragement preference are sent to Solis's existing server for suggestions. The Gemini key remains server-side and is not included in the Android app.
           </p>
         </div>
       </div>
+
+      <section className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-3">
+        <div className="flex items-start gap-3">
+          <input
+            id="ai-data-sharing-consent"
+            type="checkbox"
+            checked={preferences.aiDataSharingConsent}
+            onChange={(event) => onUpdatePreferences({ aiDataSharingConsent: event.target.checked })}
+            className="mt-1 h-4 w-4 accent-amber-600"
+          />
+          <div>
+            <label htmlFor="ai-data-sharing-consent" className="text-sm font-semibold text-slate-900 dark:text-white">
+              Allow Gemini to use recent activity and task check-ins for personalized suggestions
+            </label>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              Off by default. When enabled, Solis sends up to four recent days of activity categories, titles, notes, durations, planned task titles and completion dates, plus your encouragement preference to the existing Solis server, which forwards them to Gemini. Solis does not send entry IDs, exact times, or device-usage data. This is short-term context, not model training. You can turn this off at any time; local reflections remain available.
+            </p>
+            <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              Status: {preferences.aiDataSharingConsent ? 'Gemini sharing enabled' : 'No activity is sent to Gemini'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Appearance</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose a theme that feels comfortable to use.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Theme style
+            <select
+              value={preferences.themeStyle}
+              onChange={(event) => onUpdatePreferences({ themeStyle: event.target.value as ThemeStyle })}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+            >
+              <option value="clean-minimal">Clean minimal</option>
+              <option value="playful-animated">Playful</option>
+            </select>
+          </label>
+          <label className="space-y-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Accent color
+            <select
+              value={preferences.accentColor}
+              onChange={(event) => onUpdatePreferences({ accentColor: event.target.value as AccentColor })}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+            >
+              <option value="amber">Amber</option>
+              <option value="sage">Sage</option>
+              <option value="ocean">Ocean</option>
+              <option value="lavender">Lavender</option>
+              <option value="coral">Coral</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={preferences.darkMode}
+              onChange={(event) => onUpdatePreferences({ darkMode: event.target.checked })}
+              className="h-4 w-4 accent-amber-600"
+            />
+            Dark appearance
+          </label>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 space-y-2">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Connection status</h3>
+        <p className="text-xs text-slate-600 dark:text-slate-300">Sync: Not configured. Your data remains on this device.</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">Android Usage Access: {isAndroidApp() ? 'Supported by this Android build.' : 'Unavailable in a web browser; open the Android app to use device tracking.'}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">Task reminders use Android system notifications in the Android app; browser reminders work only while Solis stays open.</p>
+      </section>
+
+      <section className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">Android app-usage tracking</h3>
+          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300 mt-1">
+            Optional. Solis reads Android UsageStats for foreground app time and screen-on/keyguard events. Android records these while Solis is closed or another app is in front; Solis syncs them when opened or returned to the foreground. Data is kept locally and is not added to manual logs or sent to Gemini.
+          </p>
+        </div>
+        {preferences.usageTrackingEnabled ? (
+          <button
+            type="button"
+            onClick={() => onUpdatePreferences({ usageTrackingEnabled: false })}
+            className="rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+          >
+            Turn off app-usage tracking
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onRequestUsageAccess}
+            className="rounded-xl bg-slate-900 dark:bg-white px-4 py-2 text-xs font-semibold text-white dark:text-slate-900"
+          >
+            Enable tracking and open Usage Access
+          </button>
+        )}
+        {preferences.usageTrackingEnabled && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onRequestUsageAccess}
+              className="rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+            >
+              Open Android Usage Access settings
+            </button>
+            <button
+              type="button"
+              onClick={onSyncDeviceUsage}
+              disabled={!isAndroidApp()}
+              className="rounded-xl border border-sky-300 dark:border-sky-800 px-4 py-2 text-xs font-semibold text-sky-800 dark:text-sky-200 disabled:opacity-50"
+            >
+              Sync selected day’s app usage
+            </button>
+          </div>
+        )}
+        <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{usageStatus}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Last successful sync: {deviceUsage ? new Date(deviceUsage.syncedAt).toLocaleString() : 'No usage sync saved for the selected day.'}
+        </p>
+        <div className="rounded-xl bg-slate-50 dark:bg-slate-900/60 p-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+          Website tracking is separate. Android app usage only identifies that a browser was used, not the websites visited. Exact site data would require a browser-specific extension or an explicitly configured local VPN/filter integration; Solis does not currently have that integration and will not claim to know visited sites.
+        </div>
+      </section>
 
       {/* Backup and Data Export / Import */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-8 shadow-xs space-y-6">
@@ -108,7 +257,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             <div>
               <strong className="text-xs font-bold text-slate-900 dark:text-white block">Download Full Backup</strong>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Export all activities, notes, categories, and settings as a JSON file to your device.
+                Export activities, tasks, preferences, savings, device-usage snapshots, and lending records as a JSON backup.
               </p>
             </div>
             <button
@@ -173,7 +322,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               />
             </div>
             <span className="text-[11px] text-slate-400 block">
-              During quiet hours, reminders are muted to protect evening rest.
+              Solis task notifications are silent. Quiet hours apply to in-app audio cues.
             </span>
           </div>
 
@@ -240,7 +389,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             Erase Local Data
           </h3>
           <p className="text-xs text-rose-700/80 dark:text-rose-400/80 mt-1">
-            Permanently delete all stored activity logs and preferences from this device.
+            Permanently delete locally stored activities, tasks, preferences, savings, reminders, loans, and device-usage snapshots from this device.
           </p>
         </div>
 
@@ -251,7 +400,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             </p>
             <div className="flex items-center gap-3">
               <button
-                onClick={handleWipe}
+                onClick={() => void handleWipe()}
                 className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700"
               >
                 Yes, Permanently Delete All

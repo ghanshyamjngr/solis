@@ -22,6 +22,15 @@ jobs:
           java-version: '21'
           cache: gradle
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android build packages
+        run: sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:

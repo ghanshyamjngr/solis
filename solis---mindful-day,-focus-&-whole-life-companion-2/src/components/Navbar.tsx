@@ -1,11 +1,11 @@
 import React from 'react';
-import { Sun, Moon, Sparkles, Compass, Clock, PlusCircle, BookOpen, ShieldCheck, ChevronLeft, ChevronRight, Palette, LayoutGrid, PiggyBank } from 'lucide-react';
+import { Sun, Moon, Sparkles, Compass, Clock, PlusCircle, ChevronLeft, ChevronRight, Palette, PiggyBank, Settings, ListChecks } from 'lucide-react';
 import { AccentColor, ThemeStyle, UserPreferences } from '../types';
 import { getRelativeDateLabel, getTodayDateString } from '../utils/timeline';
 
 interface NavbarProps {
-  activeTab: 'timeline' | 'timer' | 'log' | 'widgets' | 'finance' | 'architecture' | 'privacy';
-  setActiveTab: (tab: 'timeline' | 'timer' | 'log' | 'widgets' | 'finance' | 'architecture' | 'privacy') => void;
+  activeTab: 'timeline' | 'tasks' | 'timer' | 'log' | 'finance' | 'settings';
+  setActiveTab: (tab: 'timeline' | 'tasks' | 'timer' | 'log' | 'finance' | 'settings') => void;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   preferences: UserPreferences;
@@ -185,96 +185,51 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {preferences.darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`p-2 rounded-xl transition-colors ${
+                activeTab === 'settings'
+                  ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              aria-label="Open Settings"
+              title="Settings, tracking and AI"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Navigation Tabs Bar */}
-        <nav className="flex items-center space-x-1 sm:space-x-2 border-t border-slate-100 dark:border-slate-800/80 py-2 overflow-x-auto no-scrollbar" aria-label="Main Navigation">
-          <button
-            onClick={() => setActiveTab('timeline')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'timeline'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            Daily Timeline
-          </button>
-
-          <button
-            onClick={() => setActiveTab('timer')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'timer'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            Focus Timer
-          </button>
-
-          <button
-            onClick={() => setActiveTab('log')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'log'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <PlusCircle className="w-4 h-4 text-emerald-500" />
-            Log Whole-Day Activity
-          </button>
-
-          <button
-            onClick={() => setActiveTab('widgets')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'widgets'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4 text-amber-500" />
-            Living Widgets
-          </button>
-
-          <button
-            onClick={() => setActiveTab('finance')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'finance'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <PiggyBank className="w-4 h-4 text-emerald-500" />
-            Financial Goals
-          </button>
-
-          <button
-            onClick={() => setActiveTab('architecture')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'architecture'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 text-sky-500" />
-            Architecture Blueprint & Plan
-          </button>
-
-          <button
-            onClick={() => setActiveTab('privacy')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === 'privacy'
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-teal-500" />
-            Privacy & Storage
-          </button>
-        </nav>
       </div>
+      <nav
+        className="fixed bottom-0 inset-x-0 z-50 border-t border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
+        aria-label="Main navigation"
+      >
+        <div className="max-w-2xl mx-auto grid grid-cols-6 gap-1 px-2 py-1.5">
+          {[
+            { id: 'timeline' as const, label: 'Today', icon: Clock },
+            { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
+            { id: 'timer' as const, label: 'Focus', icon: Sparkles },
+            { id: 'log' as const, label: 'Log', icon: PlusCircle },
+            { id: 'finance' as const, label: 'Money', icon: PiggyBank },
+            { id: 'settings' as const, label: 'Settings', icon: Settings },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              aria-current={activeTab === id ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                activeTab === id
+                  ? 'border-amber-200 bg-amber-50 text-amber-800 shadow-sm dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200'
+                  : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
     </header>
   );
 };

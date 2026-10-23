@@ -18,7 +18,7 @@ import {
   Smile,
   Plus
 } from 'lucide-react';
-import { ActivityCategory, ActivityEntry, UserPreferences } from '../types';
+import { ActivityCategory, ActivityEntry, DailyDeviceUsage, PlannedTask, UserPreferences } from '../types';
 import {
   formatDuration,
   formatTimeDisplay,
@@ -32,6 +32,10 @@ import { DailyInsights } from './DailyInsights';
 interface DailyTimelineProps {
   date: string;
   entries: ActivityEntry[];
+  tasks: PlannedTask[];
+  deviceUsage: DailyDeviceUsage | null;
+  usageTrackingEnabled: boolean;
+  usageStatus: string;
   preferences: UserPreferences;
   onDeleteEntry: (id: string) => void;
   onNavigateToLog: () => void;
@@ -41,6 +45,10 @@ interface DailyTimelineProps {
 export const DailyTimeline: React.FC<DailyTimelineProps> = ({
   date,
   entries,
+  tasks,
+  deviceUsage,
+  usageTrackingEnabled,
+  usageStatus,
   preferences,
   onDeleteEntry,
   onNavigateToLog,
@@ -51,6 +59,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
 
   const dayEntries = entries.filter((e) => e.date === date);
   const sortedEntries = sortEntriesChronologically(dayEntries);
+  const realDayEntries = dayEntries.filter((entry) => entry.source !== 'demo');
 
   const filteredEntries = sortedEntries.filter((e) => {
     if (selectedFilter === 'all') return true;
@@ -61,7 +70,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
     return e.category === selectedFilter;
   });
 
-  const breakdown = calculateDayBreakdown(dayEntries);
+  const breakdown = calculateDayBreakdown(realDayEntries);
   const isPlayful = preferences.themeStyle === 'playful-animated';
 
   const getCategoryIcon = (iconName: string) => {
@@ -93,7 +102,11 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
     <div className="max-w-4xl mx-auto space-y-8 py-4">
       {/* Daily Insights Component: Total focus time, activity breakdown, and AI reflections */}
       <DailyInsights
-        entries={entries}
+        entries={entries.filter((entry) => entry.source !== 'demo')}
+        tasks={tasks}
+        deviceUsage={deviceUsage}
+        usageTrackingEnabled={usageTrackingEnabled}
+        usageStatus={usageStatus}
         selectedDate={date}
         preferences={preferences}
         onStartFocus={onNavigateToTimer}
@@ -179,7 +192,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
               {formatDuration(breakdown.totalTrackedMinutes)}
             </span>
             <span className="text-[10px] text-slate-500 dark:text-slate-400">
-              {dayEntries.length} moments noted
+              {realDayEntries.length} moments noted
             </span>
           </div>
         </div>
@@ -189,7 +202,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
           <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1.5 font-medium">
               <span>Day Weave (Proportional Flow)</span>
-              <span>100% On-Device</span>
+              <span>{preferences.aiDataSharingConsent ? 'Gemini sharing enabled' : 'Local data · AI sharing off'}</span>
             </div>
             <div className="h-3 w-full bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden flex">
               {breakdown.totals.sleep > 0 && (
@@ -339,6 +352,15 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                       <h4 className="text-base font-bold text-slate-900 dark:text-white">
                         {entry.title}
                       </h4>
+                      <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        entry.source === 'demo'
+                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300'
+                          : entry.source === 'tracked'
+                          ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}>
+                        {entry.source === 'demo' ? 'Legacy demo data' : entry.source === 'tracked' ? 'Android tracked' : 'Manually logged'}
+                      </span>
 
                       {/* Notes / Reflection */}
                       {entry.notes && (

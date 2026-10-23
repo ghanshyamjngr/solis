@@ -152,6 +152,7 @@ export const ActivityLogger: React.FC<ActivityLoggerProps> = ({
 
     const newEntry: ActivityEntry = {
       id: `act-${Date.now()}`,
+      source: 'manual',
       category: catId,
       title: t,
       startTime: startTimeStr,
@@ -195,6 +196,7 @@ export const ActivityLogger: React.FC<ActivityLoggerProps> = ({
 
     const newEntry: ActivityEntry = {
       id: `act-${Date.now()}`,
+      source: 'manual',
       category,
       title: title.trim() || 'Logged Activity',
       startTime: sTime,

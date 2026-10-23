@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
@@ -42,7 +42,7 @@ const ai = process.env.GEMINI_API_KEY
 // Server-side Gemini AI Insights route
 app.post('/api/ai-insights', async (req, res) => {
   try {
-    const { activities, preferences, selectedDate } = req.body;
+    const { activities, tasks, preferences, selectedDate } = req.body;
 
     if (!ai) {
       return res.status(200).json({
@@ -52,18 +52,26 @@ app.post('/api/ai-insights', async (req, res) => {
     }
 
     const activitySummaryText = (activities || [])
-      .map((a: any) => `- [${a.category}] "${a.title}": ${a.durationMinutes} mins (${a.notes || 'no notes'})`)
+      .map((a: any) => `- ${a.date || selectedDate} [${a.category}] "${a.title}": ${a.durationMinutes} mins (${a.notes || 'no notes'})`)
       .join('\n');
 
-    const prompt = `You are Solis, a gentle, privacy-minded life companion.
-Analyze the following recorded activities for ${selectedDate}:
+    const taskSummaryText = (tasks || [])
+      .map((task: any) => `- ${task.date}: "${task.title}" (${task.repeat || 'one-time'}; ${task.completed ? 'completed' : 'not marked complete'})`)
+      .join('\n');
+
+    const prompt = `You are Solis, a gentle, privacy-minded life companion. This is a personalized suggestion based on a short recent history, not model training.
+Analyze the user's recent four-day activity and task follow-through through ${selectedDate}:
 ${activitySummaryText || 'No activities recorded yet for today.'}
+
+Planned tasks and completion check-ins:
+${taskSummaryText || 'No planned tasks were provided.'}
 
 Guiding principles:
 1. NEVER shame, guilt-trip, or judge the user.
 2. Value sleep, meals, outdoor walks, and offline time equally to screen-based focus.
 3. Observe only real facts.
-4. Tone: ${preferences?.encouragementTone || 'gentle'}.
+4. Notice realistic patterns across days and suggest one specific next action, but do not invent facts or pressure the user.
+5. Tone: ${preferences?.encouragementTone || 'gentle'}.
 
 Provide a JSON object response with:
 - summary: A 1-2 sentence warm, realistic overview of how the day was woven.

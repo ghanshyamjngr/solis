@@ -3,22 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { DailyTimeline } from './components/DailyTimeline';
 import { FocusTimer } from './components/FocusTimer';
 import { ActivityLogger } from './components/ActivityLogger';
-import { LivingWidgetsStudio } from './components/LivingWidgetsStudio';
 import { FinancialGoalsView } from './components/FinancialGoalsView';
-import { ArchitecturePlanView } from './components/ArchitecturePlanView';
 import { PrivacySettingsModal } from './components/PrivacySettingsModal';
-import { InteractiveNotificationBanner } from './components/InteractiveNotificationBanner';
+import { TaskManager } from './components/TaskManager';
 import {
   ActivityEntry,
-  DailyHabits,
+  DailyDeviceUsage,
   FinancialEntry,
-  InteractiveNotification,
-  NotificationContextType,
+  LoanEntry,
+  PlannedTask,
   SavingsGoal,
   UserPreferences,
 } from './types';
@@ -27,62 +25,60 @@ import {
   saveStoredActivities,
   loadStoredPreferences,
   saveStoredPreferences,
-  loadStoredHabits,
-  saveStoredHabits,
   loadStoredSavingsGoal,
   saveStoredSavingsGoal,
   loadStoredFinancialEntries,
   saveStoredFinancialEntries,
+  loadStoredTasks,
+  saveStoredTasks,
+  loadStoredLoans,
+  saveStoredLoans,
+  loadStoredDeviceUsage,
+  saveStoredDeviceUsage,
   DEFAULT_PREFERENCES,
-  DEFAULT_SAVINGS_GOAL,
 } from './utils/storage';
 import { getTodayDateString } from './utils/timeline';
-import { playGentleBell } from './utils/audio';
+import { checkDeviceUsageAccess, isAndroidApp, openDeviceUsageSettings, readDailyDeviceUsage } from './utils/deviceUsage';
+import { cancelTaskReminder, consumePendingTaskReminder, requestReminderPermission, rescheduleTaskAfterCheckin, restoreGrantedWebReminders, scheduleTaskReminder, updateTaskWidget } from './utils/taskReminders';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'timeline' | 'timer' | 'log' | 'widgets' | 'finance' | 'architecture' | 'privacy'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'tasks' | 'timer' | 'log' | 'finance' | 'settings'>('timeline');
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
-  const [habits, setHabits] = useState<DailyHabits>({ date: getTodayDateString(), waterGlasses: 4, waterTarget: 8, mindfulBreaksCount: 2, impulseFreeDay: true });
-  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(DEFAULT_SAVINGS_GOAL);
+  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>({
+    id: 'goal-default',
+    title: 'Add a savings goal',
+    targetAmount: 0,
+    currentAmount: 0,
+    category: 'Personal',
+  });
   const [financialEntries, setFinancialEntries] = useState<FinancialEntry[]>([]);
-  const [activeNotification, setActiveNotification] = useState<InteractiveNotification | null>(null);
+  const [loans, setLoans] = useState<LoanEntry[]>([]);
+  const [tasks, setTasks] = useState<PlannedTask[]>([]);
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const [reminderStatus, setReminderStatus] = useState('Task reminders are optional. Android reminders can arrive while Solis is closed; browser reminders require Solis to stay open.');
+  const [deviceUsage, setDeviceUsage] = useState<DailyDeviceUsage | null>(null);
+  const [usageStatus, setUsageStatus] = useState('Android app usage tracking is off.');
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   // Initialize data on mount
   useEffect(() => {
     const loadedEntries = loadStoredActivities();
     const loadedPrefs = loadStoredPreferences();
-    const loadedHabits = loadStoredHabits();
     const loadedGoal = loadStoredSavingsGoal();
     const loadedFin = loadStoredFinancialEntries();
+    const loadedTasks = loadStoredTasks();
+    const loadedLoans = loadStoredLoans();
 
     setEntries(loadedEntries);
     setPreferences(loadedPrefs);
-    setHabits(loadedHabits);
     setSavingsGoal(loadedGoal);
     setFinancialEntries(loadedFin);
+    setTasks(loadedTasks);
+    setLoans(loadedLoans);
     setIsLoaded(true);
 
-    // Initial greeting notification for demonstration
-    setTimeout(() => {
-      setActiveNotification({
-        id: 'notif-init',
-        type: 'momentum',
-        title: 'Daily Attention Check-in',
-        message: 'You have focused for 50 minutes and lived 1h 20m offline today 🌱 Keep going if you feel good, or pause for water.',
-        timestamp: 'Just now',
-        primaryAction: {
-          label: 'Drink Water (+1)',
-          actionType: 'drink_water',
-        },
-        secondaryAction: {
-          label: 'Start Focus',
-          actionType: 'start_focus',
-        },
-      });
-    }, 1500);
   }, []);
 
   // Sync dark mode class on documentElement
@@ -112,10 +108,123 @@ export default function App() {
     saveStoredPreferences(updated);
   };
 
-  const handleUpdateHabits = (updated: DailyHabits) => {
-    setHabits(updated);
-    saveStoredHabits(updated);
+  useEffect(() => {
+    if (!isLoaded) return;
+    void updateTaskWidget(tasks, getTodayDateString()).catch((error) => {
+      console.error('Could not update the Solis home-screen widget', error);
+    });
+  }, [isLoaded, tasks]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    void restoreGrantedWebReminders(tasks).catch((error) => {
+      console.error('Could not restore saved browser reminders', error);
+    });
+  }, [isLoaded]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const openCheckin = (taskId: string | null) => {
+      if (!taskId) return;
+      setPendingTaskId(taskId);
+      setActiveTab('tasks');
+    };
+    void consumePendingTaskReminder()
+      .then(({ taskId, openTasks }) => {
+        openCheckin(taskId);
+        if (openTasks) setActiveTab('tasks');
+      })
+      .catch((error) => console.error('Could not open task reminder check-in', error));
+    const onWebReminder = (event: Event) => {
+      const reminderEvent = event as CustomEvent<{ taskId?: string }>;
+      openCheckin(reminderEvent.detail?.taskId ?? null);
+    };
+    window.addEventListener('solis-task-reminder', onWebReminder);
+    return () => window.removeEventListener('solis-task-reminder', onWebReminder);
+  }, [isLoaded]);
+
+  const syncDeviceUsage = useCallback(async (date: string) => {
+    if (!isAndroidApp()) {
+      setUsageStatus('Android Usage Access is only available in the Android app. Website-level tracking is not available.');
+      return;
+    }
+    if (!preferences.usageTrackingEnabled) {
+      setUsageStatus('Android app usage tracking is off.');
+      return;
+    }
+
+    try {
+      const hasAccess = await checkDeviceUsageAccess();
+      if (!hasAccess) {
+        setUsageStatus('Usage Access is not granted. Enable it in Android Settings to read app usage.');
+        return;
+      }
+
+      const usage = await readDailyDeviceUsage(date);
+      if (!usage) {
+        setUsageStatus('Android did not return usage data for this date. Try syncing again later.');
+        return;
+      }
+      saveStoredDeviceUsage(usage);
+      setDeviceUsage(usage);
+      setUsageStatus(usage.apps.length > 0
+        ? `Synced Android usage for ${date}.`
+        : `Synced ${date}; Android returned no app usage for that day.`);
+    } catch (error) {
+      console.error('Android usage sync failed', error);
+      setUsageStatus('Could not read Android usage. Check Usage Access and try again.');
+    }
+  }, [preferences.usageTrackingEnabled]);
+
+  const handleRequestUsageAccess = async () => {
+    if (!isAndroidApp()) {
+      setUsageStatus('Android Usage Access is only available in the Android app. No website data is being collected.');
+      return;
+    }
+    handleUpdatePreferences({ usageTrackingEnabled: true });
+    try {
+      await openDeviceUsageSettings();
+      setUsageStatus('Android Usage Access settings opened. Allow access for Solis, then return to sync.');
+    } catch (error) {
+      console.error('Could not open Android Usage Access settings', error);
+      setUsageStatus('Could not open Android Usage Access settings. Open Settings → Apps → Special app access → Usage access manually.');
+    }
   };
+
+  useEffect(() => {
+    setDeviceUsage(loadStoredDeviceUsage(selectedDate));
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const refreshUsageStatus = async () => {
+      if (!isAndroidApp()) {
+        setUsageStatus('Android Usage Access is only available in the Android app. Website-level tracking is not available.');
+        return;
+      }
+      try {
+        const hasAccess = await checkDeviceUsageAccess();
+        if (!hasAccess) {
+          setUsageStatus('Usage Access is not granted. Enable it in Android Settings to read app usage.');
+        } else if (preferences.usageTrackingEnabled) {
+          await syncDeviceUsage(selectedDate);
+        } else {
+          setUsageStatus('Usage Access is granted; app-usage tracking is turned off in Solis.');
+        }
+      } catch (error) {
+        console.error('Could not check Android Usage Access', error);
+        setUsageStatus('Could not check Android Usage Access on this device.');
+      }
+    };
+    void refreshUsageStatus();
+    const syncWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshUsageStatus();
+    };
+    document.addEventListener('visibilitychange', syncWhenVisible);
+    return () => document.removeEventListener('visibilitychange', syncWhenVisible);
+  }, [isLoaded, preferences.usageTrackingEnabled, selectedDate, syncDeviceUsage]);
+
+  const selectedDeviceUsage = deviceUsage?.date === selectedDate ? deviceUsage : null;
 
   const handleUpdateSavingsGoal = (goal: SavingsGoal) => {
     setSavingsGoal(goal);
@@ -128,143 +237,93 @@ export default function App() {
     saveStoredFinancialEntries(updated);
   };
 
-  const handleQuickLog = (category: any, title: string, durationMinutes: number) => {
-    const now = new Date();
-    const endH = now.getHours().toString().padStart(2, '0');
-    const endM = now.getMinutes().toString().padStart(2, '0');
-    const endTime = `${endH}:${endM}`;
-
-    const startDate = new Date(now.getTime() - durationMinutes * 60000);
-    const startH = startDate.getHours().toString().padStart(2, '0');
-    const startM = startDate.getMinutes().toString().padStart(2, '0');
-    const startTime = `${startH}:${startM}`;
-
-    const newEntry: ActivityEntry = {
-      id: `act-${Date.now()}`,
-      category,
-      title,
-      startTime,
-      endTime,
-      date: getTodayDateString(),
-      durationMinutes,
-      createdAt: Date.now(),
-    };
-
-    handleSaveActivity(newEntry);
-    playGentleBell(preferences.soundEnabled);
+  const handleAddLoan = (loan: LoanEntry) => {
+    const updated = [loan, ...loans];
+    setLoans(updated);
+    saveStoredLoans(updated);
   };
 
-  const handleTriggerNotification = (type: NotificationContextType) => {
-    playGentleBell(preferences.soundEnabled);
-    switch (type) {
-      case 'momentum':
-        setActiveNotification({
-          id: `notif-${Date.now()}`,
-          type: 'momentum',
-          title: 'Building Steady Momentum 🌱',
-          message: 'You have focused with clarity for 35 minutes. Keep going if you feel good — you are making real progress.',
-          timestamp: 'Just now',
-          primaryAction: {
-            label: 'Keep Going',
-            actionType: 'start_focus',
-          },
-          secondaryAction: {
-            label: 'Take 5m Breather',
-            actionType: 'log_break',
-          },
-        });
-        break;
-      case 'distraction_checkin':
-        setActiveNotification({
-          id: `notif-${Date.now()}`,
-          type: 'distraction_checkin',
-          title: 'Gentle Check-in 👀',
-          message: 'Was this your plan, or did your attention drift here? You can return to your chosen goal whenever you are ready.',
-          timestamp: 'Just now',
-          primaryAction: {
-            label: 'Return to Focus',
-            actionType: 'start_focus',
-          },
-          secondaryAction: {
-            label: 'Extend Rest',
-            actionType: 'log_break',
-          },
-        });
-        break;
-      case 'rest_suggestion':
-        setActiveNotification({
-          id: `notif-${Date.now()}`,
-          type: 'rest_suggestion',
-          title: 'Rest Counts Too 💛',
-          message: 'You have put in solid mental effort today. A short pause, fresh water, or stretching your shoulders will recharge you.',
-          timestamp: 'Just now',
-          primaryAction: {
-            label: 'Drink Water (+1)',
-            actionType: 'drink_water',
-          },
-          secondaryAction: {
-            label: 'Log 15m Break',
-            actionType: 'log_break',
-          },
-        });
-        break;
-      case 'offline_celebration':
-        setActiveNotification({
-          id: `notif-${Date.now()}`,
-          type: 'offline_celebration',
-          title: 'Another Moment Lived Offline ✨',
-          message: 'Your day is bigger than your screen. Walking outdoors, talking with loved ones, and offline living count equally.',
-          timestamp: 'Just now',
-          primaryAction: {
-            label: 'Log 30m Walk',
-            actionType: 'log_offline',
-          },
-          secondaryAction: {
-            label: 'Dismiss',
-            actionType: 'dismiss',
-          },
-        });
-        break;
+  const handleSettleLoan = (id: string) => {
+    const updated = loans.map((loan) => loan.id === id
+      ? { ...loan, status: 'settled' as const, settledAt: Date.now() }
+      : loan);
+    setLoans(updated);
+    saveStoredLoans(updated);
+  };
+
+  const handleAddTask = async (task: PlannedTask) => {
+    const updated = [...tasks, task];
+    setTasks(updated);
+    saveStoredTasks(updated);
+    if (task.reminderEnabled) {
+      try {
+        const scheduled = await scheduleTaskReminder(task);
+        setReminderStatus(scheduled
+          ? `Reminder set for ${task.time}. Solis will ask whether you completed “${task.title}”.`
+          : 'Task saved, but its one-time reminder was not scheduled because that time has passed.');
+      } catch (error) {
+        console.error('Could not schedule task reminder', error);
+        setReminderStatus(error instanceof Error
+          ? `Task saved, but its reminder could not be set: ${error.message}`
+          : 'Task saved, but its reminder could not be set. Check notification permission.');
+      }
+    } else {
+      setReminderStatus('Task saved without a reminder.');
     }
   };
 
-  const handleNotificationAction = (actionType: string) => {
-    switch (actionType) {
-      case 'drink_water':
-        handleUpdateHabits({ ...habits, waterGlasses: habits.waterGlasses + 1 });
-        setActiveNotification(null);
-        break;
-      case 'start_focus':
-        setActiveTab('timer');
-        setActiveNotification(null);
-        break;
-      case 'log_break':
-        handleQuickLog('break', 'Mindful 15m Reset Pause', 15);
-        setActiveNotification(null);
-        break;
-      case 'log_offline':
-        handleQuickLog('nature', 'Outdoor Sun Walk', 30);
-        setActiveNotification(null);
-        break;
-      case 'dismiss':
-      default:
-        setActiveNotification(null);
-        break;
-    }
+  const handleToggleTask = (task: PlannedTask, date: string) => {
+    const isComplete = task.completedDates.includes(date);
+    const completedDates = isComplete
+      ? task.completedDates.filter((completedDate) => completedDate !== date)
+      : [...task.completedDates, date];
+    const updated = tasks.map((item) => item.id === task.id ? { ...item, completedDates } : item);
+    setTasks(updated);
+    saveStoredTasks(updated);
+    if (pendingTaskId === task.id) setPendingTaskId(null);
+    void rescheduleTaskAfterCheckin(task, date, !isComplete).catch((error) => {
+      console.error('Could not update task reminder after check-in', error);
+      setReminderStatus('Task check-in saved, but its next reminder could not be updated.');
+    });
+  };
+
+  const handleDeleteTask = (id: string) => {
+    const updated = tasks.filter((task) => task.id !== id);
+    setTasks(updated);
+    saveStoredTasks(updated);
+    if (pendingTaskId === id) setPendingTaskId(null);
+    void cancelTaskReminder(id).catch((error) => {
+      console.error('Could not cancel task reminder', error);
+      setReminderStatus('Task deleted, but its system reminder could not be cancelled.');
+    });
   };
 
   const handleDataReset = () => {
     const loaded = loadStoredActivities();
     const prefs = loadStoredPreferences();
-    const loadedHabits = loadStoredHabits();
     const loadedGoal = loadStoredSavingsGoal();
     const loadedFin = loadStoredFinancialEntries();
+    const loadedTasks = loadStoredTasks();
+    const loadedLoans = loadStoredLoans();
 
     setEntries(loaded);
     setPreferences(prefs);
-    setHabits(loadedHabits);
     setSavingsGoal(loadedGoal);
     setFinancialEntries(loadedFin);
+    setTasks(loadedTasks);
+    setLoans(loadedLoans);
+    if (loadedTasks.some((task) => task.reminderEnabled)) {
+      void requestReminderPermission()
+        .then((granted) => {
+          if (!granted) throw new Error('Notification permission was not granted.');
+          return Promise.all(loadedTasks.filter((task) => task.reminderEnabled).map((task) => scheduleTaskReminder(task)));
+        })
+        .then(() => setReminderStatus('Imported task reminders have been restored.'))
+        .catch((error) => {
+          console.error('Could not restore reminders from the imported backup', error);
+          setReminderStatus('Backup restored, but one or more task reminders could not be restored.');
+        });
+    }
   };
 
   if (!isLoaded) {
@@ -290,19 +349,15 @@ export default function App() {
       />
 
       {/* Main Content Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Interactive Behavior-Aware Notification Toast */}
-        <InteractiveNotificationBanner
-          notification={activeNotification}
-          onDismiss={() => setActiveNotification(null)}
-          onAction={handleNotificationAction}
-          onTriggerPreset={handleTriggerNotification}
-        />
-
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6">
         {activeTab === 'timeline' && (
           <DailyTimeline
             date={selectedDate}
             entries={entries}
+            tasks={tasks}
+            deviceUsage={selectedDeviceUsage}
+            usageTrackingEnabled={preferences.usageTrackingEnabled}
+            usageStatus={usageStatus}
             preferences={preferences}
             onDeleteEntry={handleDeleteActivity}
             onNavigateToLog={() => setActiveTab('log')}
@@ -318,6 +373,19 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'tasks' && (
+          <TaskManager
+            selectedDate={selectedDate}
+            tasks={tasks}
+            reminderStatus={reminderStatus}
+            pendingTaskId={pendingTaskId}
+            onAddTask={handleAddTask}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+            onDismissCheckin={() => setPendingTaskId(null)}
+          />
+        )}
+
         {activeTab === 'log' && (
           <ActivityLogger
             selectedDate={selectedDate}
@@ -327,37 +395,28 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'widgets' && (
-          <LivingWidgetsStudio
-            entries={entries}
-            habits={habits}
-            savingsGoal={savingsGoal}
-            preferences={preferences}
-            onUpdateHabits={handleUpdateHabits}
-            onQuickLog={handleQuickLog}
-            onStartFocusTimer={() => setActiveTab('timer')}
-          />
-        )}
-
         {activeTab === 'finance' && (
           <FinancialGoalsView
             savingsGoal={savingsGoal}
             financialEntries={financialEntries}
+            loans={loans}
             preferences={preferences}
             onUpdateSavingsGoal={handleUpdateSavingsGoal}
             onAddFinancialEntry={handleAddFinancialEntry}
+            onAddLoan={handleAddLoan}
+            onSettleLoan={handleSettleLoan}
           />
         )}
 
-        {activeTab === 'architecture' && (
-          <ArchitecturePlanView />
-        )}
-
-        {activeTab === 'privacy' && (
+        {activeTab === 'settings' && (
           <PrivacySettingsModal
             preferences={preferences}
             onUpdatePreferences={handleUpdatePreferences}
             onDataReset={handleDataReset}
+            deviceUsage={selectedDeviceUsage}
+            usageStatus={usageStatus}
+            onRequestUsageAccess={handleRequestUsageAccess}
+            onSyncDeviceUsage={() => syncDeviceUsage(selectedDate)}
           />
         )}
       </main>
@@ -365,36 +424,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-200/80 dark:border-slate-800/80 py-5 text-center text-xs text-slate-400 dark:text-slate-500 bg-white/40 dark:bg-slate-900/40">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>Solis • Whole-Day Life OS & Focus Companion • 100% On-Device & Non-Shaming</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setActiveTab('widgets')}
-              className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline"
-            >
-              Living Widgets
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setActiveTab('finance')}
-              className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline"
-            >
-              Financial Goals
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setActiveTab('architecture')}
-              className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline"
-            >
-              Multi-Platform Roadmap
-            </button>
-            <span>•</span>
-            <button
-              onClick={() => setActiveTab('privacy')}
-              className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors underline"
-            >
-              Data & Export
-            </button>
-          </div>
+          <p>Solis • Activity is stored locally; Gemini sharing is optional.</p>
         </div>
       </footer>
     </div>

@@ -12,6 +12,7 @@ export type ActivityCategory =
 
 export interface ActivityEntry {
   id: string;
+  source?: 'manual' | 'tracked' | 'demo';
   category: ActivityCategory;
   title: string;
   startTime: string; // ISO String or HH:mm
@@ -23,6 +24,41 @@ export interface ActivityEntry {
   isFocusSession?: boolean;
   moodBefore?: 'calm' | 'distracted' | 'tired' | 'energized' | 'anxious' | 'neutral';
   moodAfter?: 'fulfilled' | 'steady' | 'refreshed' | 'tired' | 'proud' | 'neutral';
+  createdAt: number;
+}
+
+export interface TrackedAppUsage {
+  packageName: string;
+  appName: string;
+  totalTimeInForegroundMs: number;
+  lastUsedAt: number;
+  launchCount: number;
+}
+
+export interface TrackedScreenUsage {
+  screenOnDurationMs: number;
+  screenOnSessionCount: number;
+  unlockCount: number;
+  measurement: string;
+}
+
+export interface DailyDeviceUsage {
+  date: string;
+  syncedAt: number;
+  apps: TrackedAppUsage[];
+  screen: TrackedScreenUsage;
+}
+
+export type TaskRepeat = 'never' | 'daily' | 'weekly';
+
+export interface PlannedTask {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  repeat: TaskRepeat;
+  reminderEnabled: boolean;
+  completedDates: string[];
   createdAt: number;
 }
 
@@ -39,6 +75,8 @@ export interface UserPreferences {
   encouragementTone: 'gentle' | 'poetic' | 'practical' | 'off';
   dailyFocusGoalMinutes: number;
   dailyOfflineGoalMinutes: number;
+  aiDataSharingConsent: boolean;
+  usageTrackingEnabled: boolean;
 }
 
 export interface DailyHabits {
@@ -56,14 +94,33 @@ export interface SavingsGoal {
   currentAmount: number;
   category: string;
   targetDate?: string;
+  currency?: string;
 }
 
 export interface FinancialEntry {
   id: string;
+  source?: 'manual' | 'demo';
   date: string;
   amountSaved: number;
   note: string;
   type: 'saved' | 'spent_mindfully' | 'impulse_avoided';
+  createdAt: number;
+  currency?: string;
+  relatedLoanId?: string;
+}
+
+export interface LoanEntry {
+  id: string;
+  person: string;
+  direction: 'lent' | 'borrowed';
+  amount: number;
+  currency: string;
+  date: string;
+  dueDate?: string;
+  note: string;
+  status: 'pending' | 'settled';
+  confirmedAt?: number;
+  settledAt?: number;
   createdAt: number;
 }
 
