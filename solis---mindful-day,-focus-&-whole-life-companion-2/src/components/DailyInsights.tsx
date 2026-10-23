@@ -22,6 +22,8 @@ import {
 import { ActivityCategory, ActivityEntry, AiDailyReflection, UserPreferences } from '../types';
 import { calculateDetailedInsights, formatDuration } from '../utils/timeline';
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') ?? '';
+
 interface DailyInsightsProps {
   entries: ActivityEntry[];
   selectedDate: string;
@@ -86,7 +88,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   const fetchAiInsights = async () => {
     setIsLoadingAi(true);
     try {
-      const res = await fetch('/api/ai-insights', {
+      const res = await fetch(`${apiBaseUrl}/api/ai-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

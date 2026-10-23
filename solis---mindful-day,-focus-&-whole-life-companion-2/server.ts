@@ -10,6 +10,23 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+app.use('/api', (req, res, next) => {
+  if (req.get('Origin') !== 'https://localhost') {
+    return next();
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', 'https://localhost');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 // Initialize Gemini client with telemetry header
 const ai = process.env.GEMINI_API_KEY
   ? new GoogleGenAI({

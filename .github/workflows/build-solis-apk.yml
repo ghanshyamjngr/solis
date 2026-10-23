@@ -1,0 +1,47 @@
+name: Build Solis Android APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: solis---mindful-day,-focus-&-whole-life-companion-2
+        run: npm install --legacy-peer-deps
+
+      - name: Sync Android project
+        working-directory: solis---mindful-day,-focus-&-whole-life-companion-2
+        run: npm run android:sync
+
+      - name: Build debug APK
+        working-directory: solis---mindful-day,-focus-&-whole-life-companion-2/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: solis---mindful-day,-focus-&-whole-life-companion-2/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
