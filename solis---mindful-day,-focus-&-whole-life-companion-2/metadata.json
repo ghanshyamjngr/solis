@@ -1,0 +1,8 @@
+{
+  "name": "Solis - Mindful Day, Focus & Whole-Life Companion",
+  "description": "A gentle, privacy-first life companion to track mindful focus sessions, log whole-day offline rhythms, and reflect without guilt or shame.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
