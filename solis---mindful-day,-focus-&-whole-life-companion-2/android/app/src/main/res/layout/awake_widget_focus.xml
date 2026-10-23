@@ -1,0 +1,50 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/solis_widget_action"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/awake_widget_surface"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <TextView
+        android:id="@+id/solis_widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="AWAKE · FOCUS"
+        android:textColor="#FF71618B"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:gravity="center"
+        android:text="25:00"
+        android:textColor="#FF312B42"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="Ready when you are"
+        android:textColor="#FF696579"
+        android:textSize="12sp" />
+    <TextView
+        android:id="@+id/solis_widget_action_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="7dp"
+        android:background="#FFE8E2F4"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:paddingVertical="6dp"
+        android:text="Start focus"
+        android:textColor="#FF594B72"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+</LinearLayout>

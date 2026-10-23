@@ -1,0 +1,46 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/solis_widget_action"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/awake_widget_surface"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <TextView
+        android:id="@+id/solis_widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="AWAKE · DAILY USAGE"
+        android:textColor="#FF5D7894"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:text="Foreground apps 0m · Screen-on 0m"
+        android:textColor="#FF312B42"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:maxLines="1"
+        android:text="Last sync: not yet synced"
+        android:textColor="#FF696579"
+        android:textSize="11sp" />
+    <TextView
+        android:id="@+id/solis_widget_action_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:maxLines="1"
+        android:text="Android Usage Access"
+        android:textColor="#FF5D7894"
+        android:textSize="10sp" />
+</LinearLayout>

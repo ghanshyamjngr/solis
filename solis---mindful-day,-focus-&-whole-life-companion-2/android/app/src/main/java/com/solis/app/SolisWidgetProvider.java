@@ -37,16 +37,23 @@ public class SolisWidgetProvider extends AppWidgetProvider {
     private static void updateWidgets(Context context, AppWidgetManager manager, int[] widgetIds, String type) {
         android.content.SharedPreferences data =
             context.getSharedPreferences("solis_home_widget", Context.MODE_PRIVATE);
-        String title = "today".equals(type) ? "TODAY’S TASKS"
+        String title = "today".equals(type) ? "TODAY STATS"
             : "focus".equals(type) ? "FOCUS"
             : "goals".equals(type) ? "GOALS & STREAK"
-            : "DAILY STATS";
-        String primary = data.getString("today".equals(type) ? "nextTask"
-            : "focus".equals(type) ? "focus" : "goals".equals(type) ? "goals" : "usage",
-            "today".equals(type) ? "No tasks planned yet" : "No saved data yet");
-        String secondary = data.getString("today".equals(type) ? "progress"
-            : "focus".equals(type) ? "focusAction" : "goals".equals(type) ? "streak" : "lastSync",
-            "today".equals(type) ? "Plan a small step today" : "Open Solis to get started");
+            : "DAILY USAGE";
+        String primaryFallback = "today".equals(type) ? "No activity logged yet"
+            : "focus".equals(type) ? "No focus session running"
+            : "goals".equals(type) ? "No savings goal yet" : "No synced usage yet";
+        String secondaryFallback = "today".equals(type) ? "No tasks planned yet"
+            : "focus".equals(type) ? "Tap to start a focus session"
+            : "goals".equals(type) ? "0-day task-completion streak" : "Sync from Today in Awake";
+        String primary = data.getString("today".equals(type) ? "stats"
+            : "focus".equals(type) ? "focus" : "goals".equals(type) ? "goals" : "usage", primaryFallback);
+        String secondary = data.getString("today".equals(type) ? "nextTask"
+            : "focus".equals(type) ? "focusAction" : "goals".equals(type) ? "streak" : "lastSync", secondaryFallback);
+        String detail = "today".equals(type)
+            ? data.getString("progress", "Add a task to see your plan")
+        : "";
 
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         PendingIntent pendingLaunch = null;
@@ -61,12 +68,27 @@ public class SolisWidgetProvider extends AppWidgetProvider {
         }
 
         for (int widgetId : widgetIds) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.solis_widget);
-            views.setTextViewText(R.id.solis_widget_title, "SOLIS · " + title);
+            int layout = "today".equals(type) ? R.layout.awake_widget_today
+                : "focus".equals(type) ? R.layout.awake_widget_focus
+                : "goals".equals(type) ? R.layout.awake_widget_goals
+                : R.layout.awake_widget_usage;
+            RemoteViews views = new RemoteViews(context.getPackageName(), layout);
+            views.setTextViewText(R.id.solis_widget_title, "AWAKE · " + title);
             views.setTextViewText(R.id.solis_widget_task, primary);
             views.setTextViewText(R.id.solis_widget_progress, secondary);
+            views.setTextViewText(R.id.solis_widget_action_label,
+                "focus".equals(type) ? data.getString("focusAction", "Tap to start a focus session")
+                    : "today".equals(type) ? detail
+                    : "");
+            if ("goals".equals(type)) {
+                views.setProgressBar(
+                    R.id.solis_widget_goal_progress,
+                    100,
+                    data.getInt("goalsProgress", 0),
+                    false
+                );
+            }
             if ("focus".equals(type)) {
-                views.setTextViewText(R.id.solis_widget_action_label, "Start / resume focus");
                 Intent focusAction = new Intent(context, FocusTimerService.class);
                 focusAction.setAction(FocusTimerService.ACTION_WIDGET_ACTION);
                 PendingIntent pendingFocus = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -75,8 +97,6 @@ public class SolisWidgetProvider extends AppWidgetProvider {
                     : PendingIntent.getService(context, 8720 + widgetId, focusAction,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
                 views.setOnClickPendingIntent(R.id.solis_widget_action_label, pendingFocus);
-            } else {
-                views.setTextViewText(R.id.solis_widget_action_label, "");
             }
             if (pendingLaunch != null) views.setOnClickPendingIntent(R.id.solis_widget_action, pendingLaunch);
             manager.updateAppWidget(widgetId, views);

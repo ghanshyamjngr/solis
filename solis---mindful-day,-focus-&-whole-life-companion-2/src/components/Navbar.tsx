@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, PiggyBank, Settings, Sparkles, UserRound } from 'lucide-react';
 import { getRelativeDateLabel, getTodayDateString } from '../utils/timeline';
 import { SolisMark } from './SolisMark';
+import { UserPreferences } from '../types';
 
 type MainTab = 'timeline' | 'tasks' | 'timer' | 'finance' | 'settings';
 
@@ -10,6 +11,8 @@ interface NavbarProps {
   setActiveTab: (tab: MainTab) => void;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
+  preferences: UserPreferences;
+  onUpdatePreferences: (updates: Partial<UserPreferences>) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -17,9 +20,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   selectedDate,
   setSelectedDate,
+  preferences,
+  onUpdatePreferences,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState('');
+  const [profileDraft, setProfileDraft] = useState({
+    profileName: preferences.profileName,
+    personalGoals: preferences.personalGoals,
+    dailyRoutine: preferences.dailyRoutine,
+    encouragementTone: preferences.encouragementTone,
+  });
   const today = getTodayDateString();
 
   const moveDate = (days: number) => {
@@ -37,6 +49,22 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
+  const openProfile = () => {
+    setProfileDraft({
+      profileName: preferences.profileName,
+      personalGoals: preferences.personalGoals,
+      dailyRoutine: preferences.dailyRoutine,
+      encouragementTone: preferences.encouragementTone,
+    });
+    setProfileFeedback('');
+    setProfileOpen((open) => !open);
+  };
+
+  const saveProfile = () => {
+    onUpdatePreferences(profileDraft);
+    setProfileFeedback('');
+  };
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-lg transition-colors dark:border-slate-800/80 dark:bg-slate-900/90">
@@ -45,16 +73,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => { setMenuOpen((open) => !open); setProfileOpen(false); }}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#AFC4F0] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               aria-label="Open profile and app menu"
               aria-expanded={menuOpen}
             >
               <SolisMark className="h-8 w-8" />
             </button>
             {menuOpen && (
-              <div className="absolute left-0 top-12 z-50 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Solis</p>
-                <button type="button" onClick={() => setProfileOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
+              <div className="absolute left-0 top-12 z-50 max-h-[calc(100dvh-5rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Awake</p>
+                <button type="button" onClick={openProfile} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
                   <UserRound className="h-4 w-4" /> Profile
                 </button>
                 <button type="button" onClick={() => openSettings()} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">
@@ -64,8 +92,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Sparkles className="h-4 w-4" /> Appearance
                 </button>
                 {profileOpen && (
-                  <div className="m-1 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900 dark:text-slate-300" role="status">
-                    Local profile · Your tasks and reflections stay on this device unless you choose to share selected context.
+                  <div className="m-1 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900" role="region" aria-label="Your profile">
+                    <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                      Optional profile details stay on this device and can shape local suggestions. Avoid adding private or sensitive information.
+                    </p>
+                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      Preferred name
+                      <input maxLength={80} value={profileDraft.profileName} onChange={(event) => setProfileDraft((draft) => ({ ...draft, profileName: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional" />
+                    </label>
+                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      Personal goals
+                      <textarea maxLength={500} rows={2} value={profileDraft.personalGoals} onChange={(event) => setProfileDraft((draft) => ({ ...draft, personalGoals: event.target.value }))} className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="What would you like to make room for?" />
+                    </label>
+                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      Routine or preferred time
+                      <textarea maxLength={500} rows={2} value={profileDraft.dailyRoutine} onChange={(event) => setProfileDraft((draft) => ({ ...draft, dailyRoutine: event.target.value }))} className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional, e.g. quiet focus in the morning" />
+                    </label>
+                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      Encouragement style
+                      <select value={profileDraft.encouragementTone} onChange={(event) => setProfileDraft((draft) => ({ ...draft, encouragementTone: event.target.value as UserPreferences['encouragementTone'] }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                        <option value="gentle">Gentle</option>
+                        <option value="poetic">Poetic</option>
+                        <option value="practical">Practical</option>
+                        <option value="off">Off</option>
+                      </select>
+                    </label>
+                    <button type="button" onClick={saveProfile} className="w-full rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white">Save profile</button>
+                    {profileFeedback && <p role="status" className="text-[10px] text-emerald-700 dark:text-emerald-300">{profileFeedback}</p>}
                   </div>
                 )}
               </div>
@@ -73,8 +126,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="text-center">
-            <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">Solis</h1>
-            <p className="hidden text-[10px] text-slate-500 dark:text-slate-400 sm:block">Whole-Day Life & Focus</p>
+            <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white">Awake</h1>
+            <p className="hidden text-[10px] text-slate-500 dark:text-slate-400 sm:block">Mindful Day & Focus</p>
           </div>
 
           <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-800">
@@ -95,11 +148,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </header>
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] z-50 flex justify-center px-4">
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200/70 bg-white/80 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgb(15_23_42/0.06)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/80"
+        className="pointer-events-auto w-full max-w-[25rem] rounded-full border border-white/70 bg-white/85 p-1.5 shadow-[0_10px_36px_rgb(38_45_67/0.18)] backdrop-blur-2xl dark:border-slate-600/70 dark:bg-slate-900/85"
         aria-label="Main navigation"
+        data-no-tab-swipe="true"
       >
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-3 py-2">
+        <div className="grid grid-cols-4 gap-1">
           {[
             { id: 'timeline' as const, label: 'Today', icon: Clock },
             { id: 'tasks' as const, label: 'Plan', icon: ListChecks },
@@ -113,16 +168,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               aria-current={activeTab === id ? 'page' : undefined}
               className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
                 activeTab === id
-                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-200'
-                  : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                  ? 'bg-[var(--solis-accent-soft)] text-[var(--solis-accent-strong)] shadow-sm dark:bg-[color-mix(in_srgb,var(--solis-accent)_22%,#1e293b)]'
+                  : 'text-slate-500 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:bg-slate-800'
               }`}
             >
-              <Icon className="h-[18px] w-[18px]" />
-              {label}
+              <Icon className={`h-[18px] w-[18px] ${activeTab === id ? 'stroke-[2.4]' : ''}`} aria-hidden="true" />
+              <span>{label}</span>
             </button>
           ))}
         </div>
       </nav>
+      </div>
     </>
   );
 };

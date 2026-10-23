@@ -99,7 +99,7 @@ public class TaskReminderReceiver extends BroadcastReceiver {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID, "Task reminders", NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Gentle reminders for tasks you planned in Solis.");
+            channel.setDescription("Gentle reminders for tasks you planned in Awake.");
             channel.setSound(null, null);
             manager.createNotificationChannel(channel);
         }
@@ -118,7 +118,7 @@ public class TaskReminderReceiver extends BroadcastReceiver {
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_solis)
             .setContentTitle("Did you complete “" + title + "”?")
-            .setContentText(body.isEmpty() ? "Open Solis to check in." : body)
+            .setContentText(body.isEmpty() ? "Open Awake to check in." : body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

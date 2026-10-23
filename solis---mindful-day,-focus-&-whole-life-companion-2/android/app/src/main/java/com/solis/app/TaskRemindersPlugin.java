@@ -121,7 +121,7 @@ public class TaskRemindersPlugin extends Plugin {
             return;
         }
         if (!notificationsEnabled()) {
-            call.reject("Notifications are disabled for Solis in Android settings.");
+            call.reject("Notifications are disabled for Awake in Android settings.");
             return;
         }
 
@@ -163,11 +163,13 @@ public class TaskRemindersPlugin extends Plugin {
     public void updateWidget(PluginCall call) {
         android.content.SharedPreferences.Editor editor =
             getContext().getSharedPreferences("solis_home_widget", Context.MODE_PRIVATE).edit();
-        String[] keys = { "nextTask", "progress", "focus", "focusAction", "goals", "streak", "usage", "lastSync" };
+        String[] keys = { "stats", "nextTask", "progress", "focus", "focusAction", "goals", "streak", "usage", "lastSync" };
         for (String key : keys) {
             String value = call.getString(key);
             if (value != null) editor.putString(key, value);
         }
+        Integer goalsProgress = call.getInt("goalsProgress");
+        if (goalsProgress != null) editor.putInt("goalsProgress", Math.max(0, Math.min(100, goalsProgress)));
         editor.apply();
         SolisWidgetProvider.updateAllWidgets(getContext());
         JSObject result = new JSObject();
@@ -201,7 +203,7 @@ public class TaskRemindersPlugin extends Plugin {
             return;
         }
         if (enabled && !notificationsEnabled()) {
-            call.reject("Enable notifications for Solis before turning on app-usage check-ins.");
+            call.reject("Enable notifications for Awake before turning on app-usage check-ins.");
             return;
         }
         android.content.SharedPreferences prefs =
@@ -262,7 +264,7 @@ public class TaskRemindersPlugin extends Plugin {
             return;
         }
         if (!notificationsEnabled()) {
-            call.reject("Notifications are disabled for Solis in Android settings.");
+            call.reject("Notifications are disabled for Awake in Android settings.");
             return;
         }
         try {
@@ -284,7 +286,7 @@ public class TaskRemindersPlugin extends Plugin {
                         + (vibrationEnabled ? "vibration" : "no vibration") + ")",
                     NotificationManager.IMPORTANCE_DEFAULT
                 );
-                channel.setDescription("A notification when you reach a saved Solis goal.");
+                channel.setDescription("A notification when you reach a saved Awake goal.");
                 if (!soundEnabled) channel.setSound(null, null);
                 channel.enableVibration(vibrationEnabled);
                 manager.createNotificationChannel(channel);

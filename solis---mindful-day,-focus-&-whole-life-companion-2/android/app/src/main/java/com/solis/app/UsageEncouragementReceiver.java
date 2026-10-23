@@ -95,7 +95,7 @@ public class UsageEncouragementReceiver extends BroadcastReceiver {
         if ("off".equals(tone)) return;
         int completed = prefs.getInt("completed_checkins", 0);
         int planned = prefs.getInt("planned_checkins", 0);
-        String title = "A gentle Solis check-in";
+        String title = "A gentle Awake check-in";
         String message = messageFor(tone, foregroundMinutes, completed, planned);
 
         String channelId = channelId(

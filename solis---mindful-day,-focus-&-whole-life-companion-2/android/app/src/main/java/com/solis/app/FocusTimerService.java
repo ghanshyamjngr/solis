@@ -118,7 +118,7 @@ public class FocusTimerService extends Service {
             .putString("quietHoursEnd", intent.getStringExtra("quietHoursEnd") == null
                 ? "07:30" : intent.getStringExtra("quietHoursEnd"))
             .apply();
-        updateFocusWidget("Running · " + getPrefs().getString("intention", "Focus session"), "Tap to pause or open Solis");
+        updateFocusWidget(focusWidgetStatus(), "Tap to pause or open Awake");
         handler.removeCallbacks(updateNotification);
         startForeground(NOTIFICATION_ID, buildRunningNotification());
         handler.postDelayed(updateNotification, 1000L);
@@ -130,7 +130,7 @@ public class FocusTimerService extends Service {
             .putLong("elapsed", getElapsedSeconds())
             .putBoolean("running", false)
             .apply();
-        updateFocusWidget("Paused · " + getPrefs().getString("intention", "Focus session"), "Tap to resume");
+        updateFocusWidget(focusWidgetStatus(), "Tap to resume");
         handler.removeCallbacks(updateNotification);
         showRunningNotification();
     }
@@ -142,7 +142,7 @@ public class FocusTimerService extends Service {
             .putLong("anchorElapsed", SystemClock.elapsedRealtime())
             .putLong("anchorWall", System.currentTimeMillis())
             .apply();
-        updateFocusWidget("Running · " + getPrefs().getString("intention", "Focus session"), "Tap to pause or open Solis");
+        updateFocusWidget(focusWidgetStatus(), "Tap to pause or open Awake");
         handler.removeCallbacks(updateNotification);
         showRunningNotification();
         handler.postDelayed(updateNotification, 1000L);
@@ -194,6 +194,14 @@ public class FocusTimerService extends Service {
         return getPrefs().getBoolean("preset", true);
     }
 
+    private String focusWidgetStatus() {
+        long seconds = isPreset() ? getRemainingSeconds() : getElapsedSeconds();
+        String timer = String.format(java.util.Locale.getDefault(), "%02d:%02d",
+            seconds / 60, seconds % 60);
+        return (isRunning() ? "Running · " : "Paused · ") + timer
+            + (isPreset() ? " left" : " elapsed");
+    }
+
     private android.content.SharedPreferences getPrefs() {
         return getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
@@ -211,7 +219,7 @@ public class FocusTimerService extends Service {
         NotificationChannel running = new NotificationChannel(
             RUNNING_CHANNEL, "Focus timer", NotificationManager.IMPORTANCE_LOW
         );
-        running.setDescription("Ongoing Solis focus session controls.");
+        running.setDescription("Ongoing Awake focus session controls.");
         running.setSound(null, null);
         manager.createNotificationChannel(running);
         for (boolean sound : new boolean[] { false, true }) {
@@ -309,7 +317,7 @@ public class FocusTimerService extends Service {
             this, completionChannelId(alertSound, alertVibration))
             .setSmallIcon(R.drawable.ic_stat_solis)
             .setContentTitle(goalReached ? "Focus goal complete" : "Focus session finished")
-            .setContentText("Your session is ready to review in Solis.")
+            .setContentText("Your session is ready to review in Awake.")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .addAction(0, "Continue", continueAction);

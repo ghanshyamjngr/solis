@@ -80,7 +80,7 @@ app.post('/api/ai-insights', async (req, res) => {
         .join('\n')
       : '';
 
-    const prompt = `You are Solis, a gentle, privacy-minded life companion. This is a personalized suggestion based on a short recent history, not model training.
+    const prompt = `You are Awake, a gentle, privacy-minded life companion. This is a personalized suggestion based on a short recent history, not model training.
 Analyze the user's recent four-day activity and task follow-through through ${selectedDate}:
 ${activitySummaryText || 'No activities recorded yet for today.'}
 

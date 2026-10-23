@@ -1,71 +1,163 @@
 @import "tailwindcss";
 
 :root {
-  --solis-accent: #f59e0b;
-  --solis-accent-soft: #fffbeb;
-  --solis-accent-border: #fde68a;
+  --solis-accent: #c98267;
+  --solis-accent-strong: #89543f;
+  --solis-accent-action: #965d45;
+  --solis-chart-accent: var(--solis-accent-action);
+  --solis-accent-soft: #f5e9df;
+  --solis-accent-border: #ddbdab;
   accent-color: var(--solis-accent);
 }
 
 html[data-accent="sage"] {
-  --solis-accent: #059669;
-  --solis-accent-soft: #ecfdf5;
-  --solis-accent-border: #a7f3d0;
+  --solis-accent: #84937a;
+  --solis-accent-strong: #53634c;
+  --solis-accent-action: #5c6d55;
+  --solis-accent-soft: #e9eee5;
+  --solis-accent-border: #bdc9b6;
 }
 
 html[data-accent="ocean"] {
-  --solis-accent: #0284c7;
-  --solis-accent-soft: #f0f9ff;
-  --solis-accent-border: #bae6fd;
+  --solis-accent: #7893a0;
+  --solis-accent-strong: #4a6470;
+  --solis-accent-action: #526e7a;
+  --solis-accent-soft: #e8eef0;
+  --solis-accent-border: #b6c8ce;
 }
 
 html[data-accent="lavender"] {
-  --solis-accent: #9333ea;
-  --solis-accent-soft: #faf5ff;
-  --solis-accent-border: #e9d5ff;
+  --solis-accent: #9b8da3;
+  --solis-accent-strong: #6d5d76;
+  --solis-accent-action: #75667d;
+  --solis-accent-soft: #efebf0;
+  --solis-accent-border: #c9bdce;
 }
 
 html[data-accent="coral"] {
-  --solis-accent: #e11d48;
-  --solis-accent-soft: #fff1f2;
-  --solis-accent-border: #fecdd3;
+  --solis-accent: #c77d6c;
+  --solis-accent-strong: #8d5144;
+  --solis-accent-action: #965a4c;
+  --solis-accent-soft: #f4e9e5;
+  --solis-accent-border: #ddbbb1;
 }
 
 html[data-accent="wallpaper"] {
-  --solis-accent: var(--solis-wallpaper-accent, #f59e0b);
-  --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 65%, black);
-  --solis-accent-soft: color-mix(in srgb, var(--solis-accent) 12%, white);
-  --solis-accent-border: color-mix(in srgb, var(--solis-accent) 42%, white);
+  --solis-accent: var(--solis-wallpaper-accent, #c98267);
+  --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 65%, #493b33);
+  --solis-accent-action: color-mix(in srgb, var(--solis-accent) 62%, #493b33);
+  --solis-accent-soft: color-mix(in srgb, var(--solis-accent) 12%, #fffaf4);
+  --solis-accent-border: color-mix(in srgb, var(--solis-accent) 42%, #fffaf4);
 }
 
 html.dark[data-accent="wallpaper"] {
   --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 72%, white);
 }
 
+html.dark[data-accent] {
+  --solis-accent-strong: color-mix(in srgb, var(--solis-accent) 55%, white);
+  --solis-chart-accent: color-mix(in srgb, var(--solis-accent) 48%, white);
+}
+
 html[data-accent] [class~="bg-amber-500"],
-html[data-accent] [class~="bg-amber-600"] {
+html[data-accent] [class~="bg-amber-600"],
+html[data-accent] [class~="bg-orange-500"] {
+  background-color: var(--solis-accent-action) !important;
+}
+
+html[data-accent] [class~="bg-indigo-500"],
+html[data-accent] [class~="bg-sky-600"],
+html[data-accent] [class~="bg-violet-500"],
+html[data-accent] [class~="bg-emerald-500"],
+html[data-accent] [class~="bg-teal-500"] {
   background-color: var(--solis-accent) !important;
 }
 
+html[data-accent] [class~="text-amber-500"],
 html[data-accent] [class~="text-amber-600"],
 html[data-accent] [class~="text-amber-700"],
-html[data-accent] [class~="text-amber-800"] {
-  color: var(--solis-accent) !important;
+html[data-accent] [class~="text-amber-800"],
+html[data-accent] [class~="text-indigo-500"],
+html[data-accent] [class~="text-indigo-600"],
+html[data-accent] [class~="text-sky-500"],
+html[data-accent] [class~="text-sky-600"],
+html[data-accent] [class~="text-sky-700"],
+html[data-accent] [class~="text-sky-800"],
+html[data-accent] [class~="text-orange-500"],
+html[data-accent] [class~="text-violet-500"],
+html[data-accent] [class~="text-violet-600"],
+html[data-accent] [class~="text-violet-700"],
+html[data-accent] [class~="text-cyan-500"],
+html[data-accent] [class~="text-cyan-600"],
+html[data-accent] svg[class~="text-purple-500"],
+html[data-accent] svg[class~="text-emerald-500"],
+html[data-accent] svg[class~="text-teal-500"] {
+  color: var(--solis-accent-strong) !important;
 }
 
-html[data-accent="wallpaper"] [class~="text-amber-600"],
-html[data-accent="wallpaper"] [class~="text-amber-700"],
-html[data-accent="wallpaper"] [class~="text-amber-800"] {
+html[data-accent="wallpaper"] [class*="text-amber-"] {
   color: var(--solis-accent-strong) !important;
 }
 
 html[data-accent] [class~="bg-amber-50"],
-html[data-accent] [class~="bg-amber-100"] {
+html[data-accent] [class~="bg-amber-100"],
+html[data-accent] [class~="bg-sky-50"],
+html[data-accent] [class~="bg-sky-50/60"],
+html[data-accent] [class~="bg-sky-100"],
+html[data-accent] [class~="bg-indigo-50"],
+html[data-accent] [class~="bg-indigo-50/60"],
+html[data-accent] [class~="bg-indigo-100"],
+html[data-accent] [class~="bg-violet-50"],
+html[data-accent] [class~="bg-violet-50/60"],
+html[data-accent] [class~="bg-violet-100"],
+html[data-accent] [class~="bg-cyan-50"],
+html[data-accent] [class~="bg-cyan-100"] {
   background-color: var(--solis-accent-soft) !important;
 }
 
 html[data-accent] [class~="border-amber-200"] {
   border-color: var(--solis-accent-border) !important;
+}
+
+html[data-accent] [class~="border-sky-200"],
+html[data-accent] [class~="border-sky-300"],
+html[data-accent] [class~="border-indigo-100"],
+html[data-accent] [class~="border-violet-200"] {
+  border-color: var(--solis-accent-border) !important;
+}
+
+html[data-accent] [class~="bg-amber-400"],
+html[data-accent] [class~="bg-indigo-400"],
+html[data-accent] [class~="bg-sky-400"],
+html[data-accent] [class~="bg-violet-400"],
+html[data-accent] [class~="bg-cyan-400"] {
+  background-color: color-mix(in srgb, var(--solis-accent) 72%, white) !important;
+}
+
+html[data-accent] [class~="bg-gradient-to-br"] {
+  background-image: none !important;
+  background-color: var(--solis-accent-action) !important;
+}
+
+html[data-accent] [role="progressbar"] > span,
+html[data-accent] [class~="bg-indigo-500"],
+html[data-accent] [class~="bg-sky-600"],
+html[data-accent] [class~="bg-violet-500"] {
+  background-color: var(--solis-accent) !important;
+}
+
+html[data-accent] button:focus-visible,
+html[data-accent] a:focus-visible,
+html[data-accent] input:focus-visible,
+html[data-accent] select:focus-visible,
+html[data-accent] textarea:focus-visible {
+  outline-color: var(--solis-accent) !important;
+  accent-color: var(--solis-accent);
+}
+
+html[data-accent] [class*="focus:ring-amber-500"]:focus,
+html[data-accent] [class*="focus-visible:ring-amber-500"]:focus-visible {
+  --tw-ring-color: var(--solis-accent) !important;
 }
 
 html[data-theme-style="clean-minimal"] [class~="rounded-3xl"] {
@@ -85,6 +177,71 @@ html[data-theme-style="soft-glass"] [class~="rounded-3xl"] {
 
 html.dark[data-theme-style="soft-glass"] [class~="rounded-3xl"] {
   background-color: rgb(30 41 59 / 0.78);
+}
+
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+html.dark #root [class~="bg-white"],
+html.dark #root [class~="bg-white/40"],
+html.dark #root [class~="bg-white/50"],
+html.dark #root [class~="bg-white/60"],
+html.dark #root [class~="bg-white/70"],
+html.dark #root [class~="bg-white/80"],
+html.dark #root [class~="bg-white/90"] {
+  background-color: #1e293b !important;
+}
+
+html.dark #root [class~="bg-slate-50"],
+html.dark #root [class~="bg-slate-50/50"],
+html.dark #root [class~="bg-slate-50/60"],
+html.dark #root [class~="bg-slate-100"] {
+  background-color: #0f172a !important;
+}
+
+html.dark[data-accent] #root [class~="bg-amber-50"],
+html.dark[data-accent] #root [class~="bg-amber-100"],
+html.dark[data-accent] #root [class~="bg-sky-50"],
+html.dark[data-accent] #root [class~="bg-sky-50/60"],
+html.dark[data-accent] #root [class~="bg-sky-100"],
+html.dark[data-accent] #root [class~="bg-indigo-50"],
+html.dark[data-accent] #root [class~="bg-indigo-50/60"],
+html.dark[data-accent] #root [class~="bg-indigo-100"],
+html.dark[data-accent] #root [class~="bg-violet-50"],
+html.dark[data-accent] #root [class~="bg-violet-50/60"],
+html.dark[data-accent] #root [class~="bg-violet-100"],
+html.dark[data-accent] #root [class~="bg-cyan-50"],
+html.dark[data-accent] #root [class~="bg-cyan-100"] {
+  background-color: color-mix(in srgb, var(--solis-accent) 16%, #0f172a) !important;
+}
+
+html.dark #root [class~="text-slate-900"],
+html.dark #root [class~="text-slate-800"] {
+  color: #f1f5f9 !important;
+}
+
+html.dark #root [class~="text-slate-700"],
+html.dark #root [class~="text-slate-600"] {
+  color: #cbd5e1 !important;
+}
+
+html.dark #root [class~="border-slate-100"],
+html.dark #root [class~="border-slate-200"],
+html.dark #root [class~="border-slate-300"] {
+  border-color: #334155 !important;
+}
+
+html.dark #root input,
+html.dark #root textarea,
+html.dark #root select {
+  color-scheme: dark;
+}
+
+html.dark #root input::placeholder,
+html.dark #root textarea::placeholder {
+  color: #94a3b8;
 }
 
 @media (prefers-reduced-motion: reduce) {

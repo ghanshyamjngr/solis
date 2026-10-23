@@ -5,7 +5,9 @@
     android:targetCellWidth="3"
     android:targetCellHeight="2"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/solis_widget"
+    android:initialLayout="@layout/awake_widget_goals"
+    android:previewLayout="@layout/awake_widget_goals"
+    android:previewImage="@drawable/widget_preview_goals"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:description="@string/app_name" />
+    android:description="@string/widget_goals_description" />

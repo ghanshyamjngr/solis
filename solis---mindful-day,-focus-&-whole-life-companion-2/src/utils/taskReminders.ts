@@ -13,11 +13,13 @@ interface TaskRemindersPlugin {
   }): Promise<void>;
   cancel(options: { id: string }): Promise<void>;
   updateWidget(options: Partial<{
+    stats: string;
     nextTask: string;
     progress: string;
     focus: string;
     focusAction: string;
     goals: string;
+    goalsProgress: number;
     streak: string;
     usage: string;
     lastSync: string;
@@ -93,7 +95,7 @@ export async function scheduleTaskReminder(task: PlannedTask): Promise<boolean> 
     await NativeReminders.schedule({
       id: scheduledTask.id,
       title: scheduledTask.title,
-      body: 'A gentle reminder from Solis. Did you complete this task?',
+      body: 'A gentle reminder from Awake. Did you complete this task?',
       at,
       repeat: scheduledTask.repeat,
     });
@@ -108,8 +110,8 @@ export async function scheduleTaskReminder(task: PlannedTask): Promise<boolean> 
       return;
     }
     const timer = window.setTimeout(() => {
-    const notification = new Notification('Solis task reminder', {
-      body: `Did you complete “${task.title}”? Open Solis to check in.`,
+    const notification = new Notification('Awake task reminder', {
+      body: `Did you complete “${task.title}”? Open Awake to check in.`,
       tag: `solis-task-${task.id}`,
     });
     notification.onclick = () => {
@@ -165,7 +167,7 @@ export async function updateTaskWidget(tasks: PlannedTask[], date: string): Prom
   const nextTask = scheduled.find((task) => !task.completedDates.includes(date));
   await NativeReminders.updateWidget({
     nextTask: nextTask ? `${nextTask.time} · ${nextTask.title}` : scheduled.length ? 'You finished today’s plan' : 'No tasks planned yet',
-    progress: scheduled.length ? `${completed} of ${scheduled.length} tasks complete · Open Solis` : 'Plan a small step in Solis',
+    progress: scheduled.length ? `${completed} of ${scheduled.length} tasks complete · Open Awake` : 'Plan a small step in Awake',
   });
 }
 

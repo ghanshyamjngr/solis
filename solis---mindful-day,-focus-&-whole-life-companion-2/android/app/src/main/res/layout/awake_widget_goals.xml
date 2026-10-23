@@ -1,0 +1,54 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/solis_widget_action"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/awake_widget_surface"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+    <TextView
+        android:id="@+id/solis_widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="AWAKE · GOALS &amp; STREAK"
+        android:textColor="#FF5F806F"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_task"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="No savings goal yet"
+        android:textColor="#FF312B42"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+    <ProgressBar
+        android:id="@+id/solis_widget_goal_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="7dp"
+        android:layout_marginTop="9dp"
+        android:indeterminate="false"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="#FF789384"
+        android:progressBackgroundTint="#FFE3E9E4" />
+    <TextView
+        android:id="@+id/solis_widget_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:maxLines="1"
+        android:text="0-day task-completion streak"
+        android:textColor="#FF696579"
+        android:textSize="12sp" />
+    <TextView
+        android:id="@+id/solis_widget_action_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="1sp" />
+</LinearLayout>

@@ -226,7 +226,7 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
                 >
                   {['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD', 'JPY', 'CNY', 'MXN', 'BRL', 'CHF', 'NZD'].map((code) => <option key={code} value={code}>{code}</option>)}
                 </select>
-                {savingsGoal.currentAmount > 0 && <p className="mt-1 text-[10px] text-slate-500">Currency is locked while the goal has a balance; Solis does not convert amounts.</p>}
+                {savingsGoal.currentAmount > 0 && <p className="mt-1 text-[10px] text-slate-500">Currency is locked while the goal has a balance; Awake does not convert amounts.</p>}
               </div>
             </div>
             <button
@@ -366,7 +366,7 @@ export const FinancialGoalsView: React.FC<FinancialGoalsViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2"><HandCoins className="h-5 w-5 text-amber-600" />Lending & borrowing</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A private, manual record only. Solis does not verify transfers or contact the other person.</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A private, manual record only. Awake does not verify transfers or contact the other person.</p>
           </div>
           <button type="button" onClick={() => setShowLoanForm(!showLoanForm)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white dark:bg-white dark:text-slate-900"><Plus className="h-4 w-4" />Record a loan</button>
         </div>

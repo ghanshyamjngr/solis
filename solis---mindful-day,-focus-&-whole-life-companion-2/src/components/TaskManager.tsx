@@ -91,7 +91,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Plan · Do · Reflect</p>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Tasks & follow-through</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Choose a realistic next step. Solis will remind you, then you can check in honestly.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Choose a realistic next step. Awake will remind you, then you can check in honestly.</p>
       </header>
 
       <form onSubmit={submit} className="space-y-4 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 sm:p-6">
@@ -125,7 +125,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         </div>
         <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
           <input type="checkbox" checked={reminderEnabled} onChange={(event) => setReminderEnabled(event.target.checked)} className="mt-0.5 accent-amber-600" />
-          <span><strong className="font-semibold">Remind me at the preferred time.</strong> Notifications are delivered by Android when available; in a browser, Solis must remain open.</span>
+          <span><strong className="font-semibold">Remind me at the preferred time.</strong> Notifications are delivered by Android when available; in a browser, Awake must remain open.</span>
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 dark:bg-white dark:text-slate-900">

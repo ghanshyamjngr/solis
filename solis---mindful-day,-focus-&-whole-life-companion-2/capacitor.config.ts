@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.solis.app',
-  appName: 'Solis',
+  appName: 'Awake',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

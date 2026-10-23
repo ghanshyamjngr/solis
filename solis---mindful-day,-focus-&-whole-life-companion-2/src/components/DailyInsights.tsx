@@ -23,7 +23,7 @@ import {
   ThumbsDown,
   X,
 } from 'lucide-react';
-import { ActivityCategory, ActivityEntry, AiDailyReflection, DailyDeviceUsage, PlannedTask, UserPreferences } from '../types';
+import { ActivityCategory, ActivityEntry, AiDailyReflection, DailyDeviceUsage, PlannedTask, StatsGraphStyle, UserPreferences } from '../types';
 import { calculateDetailedInsights, formatDuration } from '../utils/timeline';
 import { loadRecentStoredDeviceUsage } from '../utils/storage';
 
@@ -32,6 +32,117 @@ type SuggestionResponse = {
   date: string;
   action: 'accepted' | 'dismissed' | 'not-useful' | 'edited';
   editedSummary?: string;
+};
+
+interface UsageChartDatum {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+const usageChartColors = [
+  'var(--solis-accent-action)',
+  '#789384',
+  '#7895A8',
+  '#9B88A8',
+  '#C58B78',
+  '#9A9CA8',
+];
+
+const UsageChart: React.FC<{
+  data: UsageChartDatum[];
+  style: StatsGraphStyle;
+  label: string;
+}> = ({ data, style, label }) => {
+  const chartData = data.slice(0, 7);
+  const donutData = chartData.filter((item) => item.value > 0);
+  const maxValue = Math.max(1, ...chartData.map((item) => item.value));
+  const accessibleSummary = chartData.map((item) => `${item.label}: ${formatDuration(item.value)}`).join(', ');
+  if (!chartData.some((item) => item.value > 0)) return <p className="text-xs text-slate-500 dark:text-slate-400">No usage data to chart yet.</p>;
+
+  return (
+    <div role="img" aria-label={`${label}. ${accessibleSummary}`} data-no-tab-swipe="true" className="space-y-2">
+      {style === 'bar' && chartData.map((item, index) => (
+        <div key={item.label} className="grid grid-cols-[minmax(4rem,auto)_1fr_auto] items-center gap-2 text-[10px]">
+          <span className="max-w-24 truncate text-slate-600 dark:text-slate-300">{item.label}</span>
+          <span className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+            <span
+              className="block h-full rounded-full"
+              style={{ width: `${item.value > 0 ? Math.max(2, (item.value / maxValue) * 100) : 0}%`, backgroundColor: item.color ?? 'var(--solis-chart-accent)' }}
+            />
+          </span>
+          <span className="font-mono text-slate-600 dark:text-slate-300">{formatDuration(item.value)}</span>
+        </div>
+      ))}
+      {style === 'line' && (
+        <div className="min-w-0">
+          <svg viewBox="0 0 240 88" className="h-28 w-full overflow-visible" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M8 76H232 M8 44H232 M8 12H232" stroke="currentColor" className="text-slate-200 dark:text-slate-700" strokeDasharray="3 4" />
+            <polyline
+              points={chartData.map((item, index) => {
+                const x = chartData.length === 1 ? 120 : 10 + (index * 220) / (chartData.length - 1);
+                const y = 76 - (item.value / maxValue) * 62;
+                return `${x},${y}`;
+              }).join(' ')}
+              fill="none"
+              stroke="var(--solis-chart-accent)"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {chartData.map((item, index) => {
+              const x = chartData.length === 1 ? 120 : 10 + (index * 220) / (chartData.length - 1);
+              const y = 76 - (item.value / maxValue) * 62;
+              return <circle key={item.label} cx={x} cy={y} r="3" fill="var(--solis-chart-accent)" />;
+            })}
+          </svg>
+          <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-slate-500 dark:text-slate-400">
+            {chartData.map((item) => <span key={item.label} className="truncate">{item.label}</span>)}
+          </div>
+        </div>
+      )}
+      {style === 'donut' && (
+        <div className="flex flex-wrap items-center gap-4">
+          <svg viewBox="0 0 44 44" className="h-24 w-24 shrink-0 -rotate-90" aria-hidden="true">
+            <circle cx="22" cy="22" r="16" fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-700" strokeWidth="8" />
+            {(() => {
+              const circumference = 2 * Math.PI * 16;
+              let offset = 0;
+              return donutData.map((item, index) => {
+                const length = (item.value / donutData.reduce((sum, datum) => sum + datum.value, 0)) * circumference;
+                const circle = (
+                  <circle
+                    key={item.label}
+                    cx="22"
+                    cy="22"
+                    r="16"
+                    fill="none"
+                    stroke={item.color ?? usageChartColors[index % usageChartColors.length]}
+                    strokeWidth="8"
+                    strokeDasharray={`${length} ${circumference - length}`}
+                    strokeDashoffset={-offset}
+                  />
+                );
+                offset += length;
+                return circle;
+              });
+            })()}
+          </svg>
+          <ul className="min-w-32 flex-1 space-y-1.5 text-[10px]">
+            {donutData.map((item, index) => (
+              <li key={item.label} className="flex items-center justify-between gap-3">
+                <span className="flex min-w-0 items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                  <i className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color ?? usageChartColors[index % usageChartColors.length] }} />
+                  <span className="truncate">{item.label}</span>
+                </span>
+                <strong className="shrink-0 font-mono text-slate-700 dark:text-slate-200">{formatDuration(item.value)}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 };
 
 function loadRecentSuggestionFeedback(endDate: string): Array<{ date: string; action: SuggestionResponse['action'] }> {
@@ -210,6 +321,15 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
       gentleNudge = 'Start with one mindful choice today.';
     }
 
+    if (preferences.personalGoals.trim()) {
+      gentleNudge = `If it feels right, take one small step toward your goal: ${preferences.personalGoals.trim()}.`;
+    } else if (preferences.dailyRoutine.trim()) {
+      gentleNudge = `A gentle option that fits your routine: ${preferences.dailyRoutine.trim()}.`;
+    }
+    if (preferences.profileName.trim()) {
+      summary = `${preferences.profileName.trim()}, ${summary.charAt(0).toLowerCase()}${summary.slice(1)}`;
+    }
+
     return {
       summary,
       encouragement,
@@ -222,13 +342,15 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   };
 
   const fetchAiInsights = async () => {
-    if (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0) {
+    const hasProfileContext = Boolean(preferences.personalGoals.trim() || preferences.dailyRoutine.trim());
+    if (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0 && !hasProfileContext) {
       setAiInsight(null);
       setAiStatus('No recent synced or logged data is available for a suggestion.');
       return;
     }
 
-    if (!preferences.aiDataSharingConsent && !preferences.aiUsageDataSharingConsent) {
+    if ((!preferences.aiDataSharingConsent && !preferences.aiUsageDataSharingConsent)
+      || (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0)) {
       setAiInsight(generateLocalReflection());
       setAiStatus('Local suggestion; no activity or device usage was sent to Gemini.');
       return;
@@ -258,7 +380,16 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.available && data.insight) {
-          setAiInsight(data.insight);
+          const insight = { ...data.insight };
+          if (preferences.personalGoals.trim()) {
+            insight.gentleNudge = `If it feels right, take one small step toward your goal: ${preferences.personalGoals.trim()}.`;
+          } else if (preferences.dailyRoutine.trim()) {
+            insight.gentleNudge = `A gentle option that fits your routine: ${preferences.dailyRoutine.trim()}.`;
+          }
+          if (preferences.profileName.trim()) {
+            insight.summary = `${preferences.profileName.trim()}, ${insight.summary.charAt(0).toLowerCase()}${insight.summary.slice(1)}`;
+          }
+          setAiInsight(insight);
           setAiStatus('Gemini suggestion based on the sharing options you enabled. Tracked facts remain separate.');
           setIsLoadingAi(false);
           return;
@@ -282,6 +413,9 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
     preferences.aiDataSharingConsent,
     preferences.aiUsageDataSharingConsent,
     preferences.encouragementTone,
+    preferences.profileName,
+    preferences.personalGoals,
+    preferences.dailyRoutine,
   ]);
 
   const getCategoryIcon = (cat: ActivityCategory) => {
@@ -333,7 +467,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
             onClick={fetchAiInsights}
             disabled={isLoadingAi || (contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-            title={contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0 ? 'Sync usage or add a real task or activity first' : 'Refresh Solis suggestion'}
+            title={contextEntries.length === 0 && contextTasks.length === 0 && usageSummary.length === 0 ? 'Sync usage or add a real task or activity first' : 'Refresh Awake suggestion'}
             aria-label="Refresh AI Insights"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingAi ? 'animate-spin text-amber-500' : ''}`} />
@@ -375,7 +509,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                 <button
                   type="button"
                   onClick={onRefreshUsage}
-                  disabled={isUsageRefreshing || !usageTrackingEnabled}
+                  disabled={isUsageRefreshing}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 dark:border-sky-800 px-2.5 py-1.5 text-[11px] font-semibold text-sky-800 dark:text-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Refresh Android app usage"
                 >
@@ -386,9 +520,13 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
             </div>
 
             {!usageTrackingEnabled ? (
-              <p className="text-xs text-slate-600 dark:text-slate-300">Tracking is off. Turn it on in Settings and grant Android Usage Access to see real device usage. Manual logs above are not device-tracked.</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
+                {usageStatus} Turn on Android app-usage tracking in Settings, then grant Awake Usage Access in Android Settings. Refresh does not change this setting. Manual logs above remain separate.
+              </p>
             ) : !deviceUsage ? (
-              <p className="text-xs text-slate-600 dark:text-slate-300" role="status">{usageStatus} App usage is read when Solis opens or returns to the foreground; pull down to refresh manually.</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
+                {usageStatus} {isUsageRefreshing ? 'Refreshing selected day…' : 'After enabling tracking and Usage Access, refresh here or pull down at the top of Today. Awake also syncs on return to the foreground.'}
+              </p>
             ) : (
               <>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300" role="status">{isUsageRefreshing ? 'Refreshing Android usage…' : usageStatus} · Pull down to refresh</p>
@@ -408,12 +546,31 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                   <p className="text-xs text-slate-600 dark:text-slate-300">Android returned no per-app usage for this date. This can happen when there is no recorded activity or the device has not populated the usage report yet.</p>
                 ) : (
                   <>
+                  <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-900/40">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Top apps · foreground time</h5>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">{preferences.statsGraphStyle} chart</span>
+                    </div>
+                    <UsageChart
+                      style={preferences.statsGraphStyle}
+                      label="Top apps by foreground time"
+                      data={[...deviceUsage.apps]
+                        .filter((app) => showSystemApps || !app.isSystemApp)
+                        .sort((a, b) => b.totalTimeInForegroundMs - a.totalTimeInForegroundMs)
+                        .slice(0, 6)
+                        .map((app, index) => ({
+                          label: app.appName && app.appName !== app.packageName ? app.appName : 'Unknown app',
+                          value: Math.round(app.totalTimeInForegroundMs / 60000),
+                          color: usageChartColors[index % usageChartColors.length],
+                        }))}
+                    />
+                  </div>
                   <ul className="divide-y divide-sky-100 dark:divide-slate-700">
                     {[...deviceUsage.apps]
                       .filter((app) => showSystemApps || !app.isSystemApp)
                       .sort((a, b) => b.totalTimeInForegroundMs - a.totalTimeInForegroundMs)
                       .map((app) => (
-                        <li key={app.packageName} className="flex items-center justify-between gap-3 py-2 text-xs">
+                        <li key={app.packageName} data-no-tab-swipe="true" className="flex items-center justify-between gap-3 py-2 text-xs">
                           <span className="flex min-w-0 flex-1 items-center gap-2">
                             {app.appIconDataUrl ? <img src={app.appIconDataUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain" /> : (
                               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sky-100 text-[10px] font-bold text-sky-800 dark:bg-slate-700 dark:text-sky-200" aria-hidden="true">
@@ -425,10 +582,10 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                                 {app.appName && app.appName !== app.packageName ? app.appName : 'Unknown app'}
                               </strong>
                               {(!app.appName || app.appName === app.packageName || app.appName === 'Unknown app') && <span className="block truncate text-[10px] text-slate-500">{app.packageName}</span>}
-                              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-700" role="progressbar" aria-label={`${app.appName || 'Unknown app'} foreground share`}>
+                              <span data-no-tab-swipe="true" className="mt-1 block h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-700" role="progressbar" aria-label={`${app.appName || 'Unknown app'} foreground share`}>
                                 <span
-                                  className="block h-full rounded-full bg-sky-600 dark:bg-sky-400"
-                                  style={{ width: `${Math.max(2, Math.round((app.totalTimeInForegroundMs / Math.max(1, ...deviceUsage.apps.map((item) => item.totalTimeInForegroundMs))) * 100))}%` }}
+                                  className="block h-full rounded-full"
+                                  style={{ backgroundColor: 'var(--solis-chart-accent)', width: `${Math.max(2, Math.round((app.totalTimeInForegroundMs / Math.max(1, ...deviceUsage.apps.map((item) => item.totalTimeInForegroundMs))) * 100))}%` }}
                                 />
                               </span>
                             </span>
@@ -453,41 +610,40 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                     <div className="mt-4 border-t border-sky-100 pt-3 dark:border-slate-700">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Synced device usage · last 7 days</h5>
-                        <span className="flex gap-3 text-[10px] text-slate-600 dark:text-slate-300">
-                          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-sky-600" />Foreground apps</span>
-                          <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-violet-500" />Screen-on</span>
-                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{preferences.statsGraphStyle} chart</span>
                       </div>
-                      <div className="space-y-2">
-                        {recentDeviceUsage.map((snapshot) => {
-                          const foregroundMs = snapshot.apps.reduce((total, app) => total + app.totalTimeInForegroundMs, 0);
-                          const maxMs = Math.max(1, ...recentDeviceUsage.flatMap((item) => [
-                            item.apps.reduce((total, app) => total + app.totalTimeInForegroundMs, 0),
-                            item.screen.screenOnDurationMs,
-                          ]));
-                          return (
-                            <div key={snapshot.date} className="grid grid-cols-[44px_1fr_auto] items-center gap-2 text-[10px]">
-                              <span className="text-slate-500">{snapshot.date.slice(5)}</span>
-                              <div className="space-y-1" aria-label={`${snapshot.date}: ${formatDuration(Math.round(foregroundMs / 60000))} foreground app time; ${formatDuration(Math.round(snapshot.screen.screenOnDurationMs / 60000))} screen-on time`}>
-                                <div className="h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-slate-700">
-                                  <div className="h-full rounded-full bg-sky-600" style={{ width: `${Math.round((foregroundMs / maxMs) * 100)}%` }} />
-                                </div>
-                                <div className="h-1.5 overflow-hidden rounded-full bg-violet-100 dark:bg-slate-700">
-                                  <div className="h-full rounded-full bg-violet-500" style={{ width: `${Math.round((snapshot.screen.screenOnDurationMs / maxMs) * 100)}%` }} />
-                                </div>
-                              </div>
-                              <span className="text-right text-slate-600 dark:text-slate-300">{formatDuration(Math.round(foregroundMs / 60000))} / {formatDuration(Math.round(snapshot.screen.screenOnDurationMs / 60000))}</span>
-                            </div>
-                          );
-                        })}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="min-w-0">
+                          <h6 className="mb-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">Foreground-app time</h6>
+                          <UsageChart
+                            style={preferences.statsGraphStyle}
+                            label="Daily foreground-app time"
+                            data={recentDeviceUsage.map((snapshot) => ({
+                              label: snapshot.date.slice(5),
+                              value: Math.round(snapshot.apps.reduce((sum, app) => sum + app.totalTimeInForegroundMs, 0) / 60000),
+                            }))}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h6 className="mb-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300">Screen-on time</h6>
+                          <UsageChart
+                            style={preferences.statsGraphStyle}
+                            label="Daily screen-on time"
+                            data={recentDeviceUsage.map((snapshot) => ({
+                              label: snapshot.date.slice(5),
+                              value: Math.round(snapshot.screen.screenOnDurationMs / 60000),
+                              color: '#8293B6',
+                            }))}
+                          />
+                        </div>
                       </div>
-                      <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">Only days with a saved Android sync are shown. Foreground-app time and screen-on time are different measurements and are not added together.</p>
+                      <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">Only days with a saved Android sync are shown. Foreground-app time and screen-on time are separate measurements; neither is added to the other.</p>
                     </div>
                   )}
                   </>
                 )}
                 <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  Android reports app usage, not visited websites. Website-level tracking needs a separate browser-specific extension/integration; Solis cannot infer sites from browser usage.
+                  Android reports app usage, not visited websites. Website-level tracking needs a separate browser-specific extension/integration; Awake cannot infer sites from browser usage.
                 </p>
               </>
             )}
@@ -636,7 +792,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  Solis suggestion · not a tracked fact
+                  Awake suggestion · not a tracked fact
                   <span className="text-[10px] font-normal text-slate-400 ml-1">
                     ({aiInsight.source === 'gemini' ? 'Gemini 3.8 Flash' : 'On-Device Intelligence'})
                   </span>

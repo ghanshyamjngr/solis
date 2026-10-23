@@ -34,6 +34,11 @@ const INTENTION_SUGGESTIONS = [
   'Mindful Decluttering',
 ];
 
+const formatTimerClock = (seconds: number) => {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, '0')}:${String(safeSeconds % 60).padStart(2, '0')}`;
+};
+
 export const FocusTimer: React.FC<FocusTimerProps> = ({
   preferences,
   onSaveSession,
@@ -166,8 +171,6 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
           handleSessionFinish(Math.max(1, Math.round(saved.durationSeconds / 60)));
         }
       }
-      void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
-        .catch((error) => console.error('Could not refresh focus widget data', error));
     };
     tick();
     const timer = window.setInterval(tick, 1000);
@@ -206,7 +209,10 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
         return;
       }
     }
-    void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
+    void updateWidgetData({
+      focus: `Running · ${mode === 'preset' ? `${formatTimerClock(durationSeconds)} left` : '00:00 elapsed'}`,
+      focusAction: 'Tap to pause',
+    })
       .catch((error) => console.error('Could not refresh focus widget data', error));
     if (!isPaused) setSessionStartTime(new Date(now).toTimeString().slice(0, 5));
     setIsRunning(true);
@@ -216,7 +222,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
 
   const handlePause = async () => {
     const saved = loadFocusTimer();
-    const elapsed = saved.elapsedSeconds + Math.max(0, Math.floor((Date.now() - saved.startedAt) / 1000));
+    const elapsed = saved.elapsedSeconds;
     const paused = { ...saved, running: false, elapsedSeconds: elapsed };
     saveFocusTimer(paused);
     if (isNativeFocusTimer()) {
@@ -227,7 +233,10 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
         setTimerError('The notification timer could not be paused.');
       }
     }
-    void updateWidgetData({ focus: `Paused · ${intention || 'Focus session'}`, focusAction: 'Tap to resume in Solis' })
+    void updateWidgetData({
+      focus: `Paused · ${saved.mode === 'preset' ? `${formatTimerClock(Math.max(0, saved.durationSeconds - elapsed))} left` : `${formatTimerClock(elapsed)} elapsed`}`,
+      focusAction: 'Tap to resume',
+    })
       .catch((error) => console.error('Could not refresh focus widget data', error));
     setElapsedSeconds(elapsed);
     setRemainingSeconds(Math.max(0, saved.durationSeconds - elapsed));
@@ -248,7 +257,11 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
         return;
       }
     }
-    void updateWidgetData({ focus: `Running · ${intention || 'Focus session'}`, focusAction: 'Open Solis to view timer' })
+    const elapsed = saved.elapsedSeconds;
+    void updateWidgetData({
+      focus: `Running · ${saved.mode === 'preset' ? `${formatTimerClock(Math.max(0, saved.durationSeconds - elapsed))} left` : `${formatTimerClock(elapsed)} elapsed`}`,
+      focusAction: 'Tap to pause',
+    })
       .catch((error) => console.error('Could not refresh focus widget data', error));
     setIsRunning(true);
     setIsPaused(false);
@@ -301,7 +314,7 @@ export const FocusTimer: React.FC<FocusTimerProps> = ({
     if (isNativeFocusTimer()) {
       void finishNativeFocusTimer().catch((error) => console.error('Could not clear Android focus notification', error));
     }
-    void updateWidgetData({ focus: 'No focus session running', focusAction: 'Tap to start in Solis' })
+    void updateWidgetData({ focus: 'No focus session running', focusAction: 'Tap to start a 25-minute focus' })
       .catch((error) => console.error('Could not refresh focus widget data', error));
   };
 

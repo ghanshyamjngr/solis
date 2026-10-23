@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
 export const DEFAULT_PREFERENCES: UserPreferences = {
   themeStyle: 'playful-animated',
   accentColor: 'amber',
+  statsGraphStyle: 'bar',
   appearanceMode: 'system',
   darkMode: false,
   soundEnabled: true,
@@ -31,6 +32,9 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   aiDataSharingConsent: false,
   aiUsageDataSharingConsent: false,
   usageTrackingEnabled: false,
+  profileName: '',
+  personalGoals: '',
+  dailyRoutine: '',
 };
 
 export const DEFAULT_SAVINGS_GOAL: SavingsGoal = {
@@ -147,6 +151,12 @@ export function loadStoredPreferences(): UserPreferences {
     return {
       ...DEFAULT_PREFERENCES,
       ...stored,
+      statsGraphStyle: ['bar', 'line', 'donut'].includes(stored.statsGraphStyle)
+        ? stored.statsGraphStyle
+        : DEFAULT_PREFERENCES.statsGraphStyle,
+      profileName: typeof stored.profileName === 'string' ? stored.profileName.slice(0, 80) : '',
+      personalGoals: typeof stored.personalGoals === 'string' ? stored.personalGoals.slice(0, 500) : '',
+      dailyRoutine: typeof stored.dailyRoutine === 'string' ? stored.dailyRoutine.slice(0, 500) : '',
       appearanceMode: stored.appearanceMode
         ?? (stored.darkMode === true ? 'dark' : stored.darkMode === false ? 'light' : DEFAULT_PREFERENCES.appearanceMode),
     };

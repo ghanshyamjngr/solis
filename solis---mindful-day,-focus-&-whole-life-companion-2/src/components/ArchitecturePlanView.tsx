@@ -107,13 +107,13 @@ Please provide only the necessary edits for this single change.`;
             <div className="prose dark:prose-invert max-w-none text-sm text-slate-700 dark:text-slate-300 space-y-4 leading-relaxed">
               <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900 text-slate-800 dark:text-amber-200">
                 <p className="font-medium">
-                  <strong>Core Statement:</strong> Solis is a warm, privacy-first personal life companion that helps people understand the complete rhythm of their days, protect their attention, and celebrate mindful progress—without guilt, shaming, or aggressive digital surveillance.
+                  <strong>Core Statement:</strong> Awake is a warm, privacy-first personal life companion that helps people understand the complete rhythm of their days, protect their attention, and celebrate mindful progress—without guilt, shaming, or aggressive digital surveillance.
                 </p>
               </div>
 
               <h3 className="text-base font-bold text-slate-900 dark:text-white pt-2">Primary User Benefit</h3>
               <p>
-                Unlike standard "screen time" tools that measure only phone usage and make users feel delinquent, Solis honors the <strong>whole human day</strong>. A meaningful day consists of restful sleep, nourishing meals, outdoor movement, offline conversations, and quiet recovery—not merely hours spent in productivity software.
+                Unlike standard "screen time" tools that measure only phone usage and make users feel delinquent, Awake honors the <strong>whole human day</strong>. A meaningful day consists of restful sleep, nourishing meals, outdoor movement, offline conversations, and quiet recovery—not merely hours spent in productivity software.
               </p>
 
               <h3 className="text-base font-bold text-slate-900 dark:text-white pt-2">Guiding Design Principles</h3>

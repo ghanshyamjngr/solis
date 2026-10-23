@@ -1,11 +1,15 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Solis</string>
-    <string name="title_activity_main">Solis</string>
+    <string name="app_name">Awake</string>
+    <string name="title_activity_main">Awake</string>
     <string name="package_name">com.solis.app</string>
     <string name="custom_url_scheme">com.solis.app</string>
-    <string name="widget_today_name">Solis Today’s tasks</string>
-    <string name="widget_focus_name">Solis Focus timer</string>
-    <string name="widget_goals_name">Solis Goals and streak</string>
-    <string name="widget_usage_name">Solis Daily stats</string>
+    <string name="widget_today_name">Awake Today stats</string>
+    <string name="widget_focus_name">Awake Focus timer</string>
+    <string name="widget_goals_name">Awake Goals &amp; streak</string>
+    <string name="widget_usage_name">Awake Daily usage</string>
+    <string name="widget_today_description">Focus and offline totals with your next task.</string>
+    <string name="widget_focus_description">A focus session status and start or resume action.</string>
+    <string name="widget_goals_description">Your savings goal progress and task streak.</string>
+    <string name="widget_usage_description">Foreground app time, screen-on time, and last sync.</string>
 </resources>

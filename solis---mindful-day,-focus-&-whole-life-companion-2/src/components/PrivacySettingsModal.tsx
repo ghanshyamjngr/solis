@@ -12,10 +12,12 @@ import {
   CheckCircle2,
   Target
 } from 'lucide-react';
-import { AccentColor, AppearanceMode, DailyDeviceUsage, ThemeStyle, UserPreferences } from '../types';
+import { ActivityEntry, AccentColor, AppearanceMode, DailyDeviceUsage, PlannedTask, SavingsGoal, StatsGraphStyle, ThemeStyle, UserPreferences } from '../types';
 import { exportDataAsJSON, importDataFromJSON, loadStoredTasks, wipeAllLocalData } from '../utils/storage';
 import { isAndroidApp } from '../utils/deviceUsage';
 import { cancelTaskReminder, requestReminderPermission, updateTaskWidget } from '../utils/taskReminders';
+import { calculateDetailedInsights, formatDuration, getTodayDateString } from '../utils/timeline';
+import { loadFocusTimer, readNativeFocusTimer, saveFocusTimer } from '../utils/focusTimer';
 
 interface PrivacySettingsProps {
   preferences: UserPreferences;
@@ -26,7 +28,37 @@ interface PrivacySettingsProps {
   encouragementStatus: string;
   onRequestUsageAccess: () => void;
   onSyncDeviceUsage: () => void;
+  tasks: PlannedTask[];
+  entries: ActivityEntry[];
+  savingsGoal: SavingsGoal;
 }
+
+const GraphStylePreview: React.FC<{ style: StatsGraphStyle }> = ({ style }) => {
+  if (style === 'line') {
+    return (
+      <svg viewBox="0 0 96 36" className="h-9 w-24 text-[var(--solis-chart-accent)]" aria-hidden="true">
+        <path d="M4 31H92" stroke="currentColor" opacity=".18" />
+        <polyline points="5,25 25,18 44,22 65,9 91,13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="65" cy="9" r="2.5" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (style === 'donut') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-10 w-10 -rotate-90 text-[var(--solis-chart-accent)]" aria-hidden="true">
+        <circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" opacity=".18" strokeWidth="6" />
+        <circle cx="20" cy="20" r="15" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="58 94" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <div className="flex h-9 w-24 items-end gap-1.5 px-1" aria-hidden="true">
+      {[45, 72, 55, 90, 64].map((height, index) => (
+        <span key={index} className="flex-1 rounded-t bg-[var(--solis-chart-accent)]" style={{ height: `${height}%`, opacity: 0.55 + index * 0.08 }} />
+      ))}
+    </div>
+  );
+};
 
 export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
   preferences,
@@ -37,8 +69,12 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
   encouragementStatus,
   onRequestUsageAccess,
   onSyncDeviceUsage,
+  tasks,
+  entries,
+  savingsGoal,
 }) => {
   const [showConfirmWipe, setShowConfirmWipe] = useState(false);
+  const [focusState, setFocusState] = useState(loadFocusTimer);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [appearanceFeedback, setAppearanceFeedback] = useState('');
   const [notificationFeedback, setNotificationFeedback] = useState('');
@@ -46,6 +82,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
     appearanceMode: preferences.appearanceMode,
     themeStyle: preferences.themeStyle,
     accentColor: preferences.accentColor,
+    statsGraphStyle: preferences.statsGraphStyle,
   });
   const [notificationDraft, setNotificationDraft] = useState({
     quietHoursStart: preferences.quietHoursStart,
@@ -60,14 +97,56 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
     dailyFocusGoalMinutes: preferences.dailyFocusGoalMinutes,
     dailyOfflineGoalMinutes: preferences.dailyOfflineGoalMinutes,
   });
+  const today = getTodayDateString();
+  const todayTasks = tasks.filter((task) => {
+    if (today < task.date) return false;
+    if (task.repeat === 'daily') return true;
+    if (task.repeat === 'weekly') return new Date(`${task.date}T12:00:00`).getDay() === new Date(`${today}T12:00:00`).getDay();
+    return task.date === today;
+  });
+  const nextTask = todayTasks
+    .filter((task) => !task.completedDates.includes(today))
+    .sort((first, second) => first.time.localeCompare(second.time))[0];
+  const completedTasks = todayTasks.filter((task) => task.completedDates.includes(today)).length;
+  const completedTaskDates = new Set(tasks.flatMap((task) => task.completedDates));
+  let taskStreak = 0;
+  const streakCursor = new Date(`${today}T12:00:00`);
+  while (completedTaskDates.has(`${streakCursor.getFullYear()}-${String(streakCursor.getMonth() + 1).padStart(2, '0')}-${String(streakCursor.getDate()).padStart(2, '0')}`)) {
+    taskStreak += 1;
+    streakCursor.setDate(streakCursor.getDate() - 1);
+  }
+  const todayStats = calculateDetailedInsights(
+    entries.filter((entry) => entry.date === today),
+    preferences.dailyFocusGoalMinutes,
+    preferences.dailyOfflineGoalMinutes,
+  );
+  const focusRemainingSeconds = Math.max(0, focusState.durationSeconds - focusState.elapsedSeconds);
+  const topUsageApp = [...(deviceUsage?.apps ?? [])].sort((first, second) => second.totalTimeInForegroundMs - first.totalTimeInForegroundMs)[0];
+  const savingsProgress = savingsGoal.targetAmount > 0
+    ? Math.min(100, Math.round((savingsGoal.currentAmount / savingsGoal.targetAmount) * 100))
+    : 0;
+
+  React.useEffect(() => {
+    if (!isAndroidApp()) return;
+    let mounted = true;
+    void readNativeFocusTimer()
+      .then((state) => {
+        if (!mounted) return;
+        setFocusState(state);
+        saveFocusTimer(state);
+      })
+      .catch((error) => console.error('Could not load the native focus state for widget previews', error));
+    return () => { mounted = false; };
+  }, []);
 
   React.useEffect(() => {
     setAppearanceDraft({
       appearanceMode: preferences.appearanceMode,
       themeStyle: preferences.themeStyle,
       accentColor: preferences.accentColor,
+      statsGraphStyle: preferences.statsGraphStyle,
     });
-  }, [preferences.appearanceMode, preferences.themeStyle, preferences.accentColor]);
+  }, [preferences.appearanceMode, preferences.themeStyle, preferences.accentColor, preferences.statsGraphStyle]);
 
   React.useEffect(() => {
     setNotificationDraft({
@@ -99,7 +178,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
 
   const saveAppearance = () => {
     onUpdatePreferences(appearanceDraft);
-    setAppearanceFeedback('Appearance saved and applied across Solis.');
+    setAppearanceFeedback('Appearance saved and applied across Awake.');
   };
 
   const saveNotificationSettings = async () => {
@@ -126,7 +205,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `solis-mindful-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `awake-mindful-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -163,7 +242,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
     try {
       await widgetUpdate;
     } catch (error) {
-      console.error('Could not clear the Solis widget after erasing local data', error);
+      console.error('Could not clear the Awake widget after erasing local data', error);
     }
     if (failed) {
       console.error(`${failed} task reminder(s) could not be cancelled while erasing local data.`);
@@ -213,7 +292,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               Allow Gemini to use recent activity categories and task check-ins
             </label>
             <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-              Off by default. When enabled, Solis sends up to four recent days of activity categories and durations, task titles and completion check-ins, and your accept/edit/dismiss feedback from earlier suggestions to the existing Solis server. Private activity notes, exact event times, and Android device usage are not included by this control. This is temporary context, not model training.
+              Off by default. When enabled, Awake sends up to four recent days of activity categories and durations, task titles and completion check-ins, and your accept/edit/dismiss feedback from earlier suggestions to the existing server. Private activity notes, exact event times, and Android device usage are not included by this control. This is temporary context, not model training.
             </p>
             <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
               Status: {preferences.aiDataSharingConsent ? 'Activity and task context sharing enabled' : 'Activity and task context stay on this device'}
@@ -282,17 +361,43 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               onChange={(event) => setAppearanceDraft((current) => ({ ...current, accentColor: event.target.value as AccentColor }))}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
             >
-              <option value="amber">Amber</option>
-              <option value="sage">Sage</option>
-              <option value="ocean">Ocean</option>
-              <option value="lavender">Lavender</option>
-              <option value="coral">Coral</option>
+              <option value="amber">Sunrise clay</option>
+              <option value="sage">Quiet sage</option>
+              <option value="ocean">Calm blue</option>
+              <option value="lavender">Dusty lilac</option>
+              <option value="coral">Soft terracotta</option>
               <option value="wallpaper">Android wallpaper color</option>
             </select>
           </label>
         </div>
+        <fieldset className="space-y-2">
+          <legend className="text-xs font-semibold text-slate-700 dark:text-slate-300">Stats graph style</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { value: 'bar', label: 'Bar' },
+              { value: 'line', label: 'Line' },
+              { value: 'donut', label: 'Donut' },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={appearanceDraft.statsGraphStyle === value}
+                onClick={() => setAppearanceDraft((current) => ({ ...current, statsGraphStyle: value }))}
+                className={`flex min-h-20 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 text-xs font-semibold transition-colors ${
+                  appearanceDraft.statsGraphStyle === value
+                    ? 'border-[var(--solis-accent-border)] bg-[var(--solis-accent-soft)] text-[var(--solis-accent-strong)]'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                }`}
+              >
+                <GraphStylePreview style={value} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">Used for Android app-usage charts. Choose Save and apply to keep this style.</p>
+        </fieldset>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          Wallpaper color is read from Android when available; web and unsupported devices use the curated amber fallback.
+          Wallpaper color is read from Android when available; web and unsupported devices use the curated sunrise-clay fallback.
         </p>
         <button
           type="button"
@@ -308,18 +413,94 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
         <h3 className="text-sm font-bold text-slate-900 dark:text-white">Connection status</h3>
         <p className="text-xs text-slate-600 dark:text-slate-300">Sync: Not configured. Your data remains on this device.</p>
         <p className="text-xs text-slate-600 dark:text-slate-300">Android Usage Access: {isAndroidApp() ? 'Supported by this Android build.' : 'Unavailable in a web browser; open the Android app to use device tracking.'}</p>
-        <p className="text-xs text-slate-600 dark:text-slate-300">Task reminders use Android system notifications in the Android app; browser reminders work only while Solis stays open.</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">Task reminders use Android system notifications in the Android app; browser reminders work only while Awake stays open.</p>
       </section>
 
-      <section className="rounded-3xl border border-violet-200 bg-violet-50/60 p-6 dark:border-violet-900/60 dark:bg-violet-950/20 space-y-2">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">Solis home-screen widgets</h3>
+      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">Awake widget previews</h3>
+          <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+            Four distinct Android launcher widgets. Previews use saved activity, task, goal, focus, and usage data where available; launcher updates are event-driven, not second-by-second.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <article className="rounded-2xl border border-slate-200 bg-[#F7F7FC] p-4 dark:border-slate-700 dark:bg-slate-900" data-no-tab-swipe="true">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Today Stats</h4>
+              <span className="text-[10px] text-slate-500">3 × 2 · resizable</span>
+            </div>
+            <div className="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-800">
+              <p className="text-[9px] font-bold tracking-wide text-slate-500">FOCUS &amp; OFFLINE</p>
+              <div className="mt-1 flex gap-4">
+                <div><strong className="block text-sm text-slate-900 dark:text-white">{formatDuration(todayStats.totalFocusMinutes)}</strong><span className="text-[9px] text-slate-500">focus logged</span></div>
+                <div><strong className="block text-sm text-slate-900 dark:text-white">{formatDuration(todayStats.totalOfflineMinutes)}</strong><span className="text-[9px] text-slate-500">offline logged</span></div>
+              </div>
+              <p className="mt-2 truncate text-[10px] text-[var(--solis-accent-strong)]">{nextTask ? `${nextTask.time} · ${nextTask.title}` : 'No tasks planned yet'}</p>
+              <p className="mt-0.5 text-[9px] text-slate-500">{todayTasks.length ? `${completedTasks} of ${todayTasks.length} tasks complete` : 'Plan a small step in Awake'}</p>
+            </div>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-[#F7F7FC] p-4 dark:border-slate-700 dark:bg-slate-900" data-no-tab-swipe="true">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Focus Timer</h4>
+              <span className="text-[10px] text-slate-500">2 × 2 · resizable</span>
+            </div>
+            <div className="flex min-h-28 flex-col items-center justify-center rounded-xl bg-white p-3 text-center shadow-sm dark:bg-slate-800">
+              <span className="text-[9px] font-bold tracking-wide text-slate-500">FOCUS SESSION</span>
+              <strong className="mt-1 text-2xl tabular-nums text-slate-900 dark:text-white">
+                {focusState.active
+                  ? `${String(Math.floor(focusRemainingSeconds / 60)).padStart(2, '0')}:${String(focusRemainingSeconds % 60).padStart(2, '0')}`
+                  : 'Ready'}
+              </strong>
+              <span className="mt-1 max-w-full truncate text-[10px] text-slate-500">
+                {focusState.active ? `${focusState.running ? 'Running' : 'Paused'}${focusState.intention ? ` · ${focusState.intention}` : ''}` : 'Tap the widget to start focus'}
+              </span>
+              <span className="mt-2 rounded-full bg-[var(--solis-accent-soft)] px-3 py-1 text-[9px] font-semibold text-[var(--solis-accent-strong)]">Start / resume</span>
+            </div>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-[#F7F7FC] p-4 dark:border-slate-700 dark:bg-slate-900" data-no-tab-swipe="true">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Goals &amp; Streak</h4>
+              <span className="text-[10px] text-slate-500">3 × 2 · resizable</span>
+            </div>
+            <div className="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-800">
+              <p className="text-[9px] font-bold tracking-wide text-slate-500">SAVINGS GOAL</p>
+              <strong className="mt-1 block truncate text-sm text-slate-900 dark:text-white">
+                {savingsGoal.targetAmount > 0
+                  ? `${savingsGoal.currency ?? 'USD'} ${savingsGoal.currentAmount.toFixed(0)} / ${savingsGoal.targetAmount.toFixed(0)}`
+                  : 'No savings goal yet'}
+              </strong>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                <div className="h-full rounded-full bg-[#789384]" style={{ width: `${savingsProgress}%` }} />
+              </div>
+              <p className="mt-2 text-[10px] text-slate-600 dark:text-slate-300">{taskStreak}-day task-completion streak</p>
+            </div>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-[#F7F7FC] p-4 dark:border-slate-700 dark:bg-slate-900" data-no-tab-swipe="true">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200">Daily Usage</h4>
+              <span className="text-[10px] text-slate-500">3 × 2 · resizable</span>
+            </div>
+            <div className="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-800">
+              <p className="text-[9px] font-bold tracking-wide text-slate-500">ANDROID APP USAGE</p>
+              {deviceUsage ? (
+                <>
+                  <strong className="mt-1 block text-xs text-slate-900 dark:text-white">
+                    {formatDuration(Math.round(deviceUsage.apps.reduce((sum, app) => sum + app.totalTimeInForegroundMs, 0) / 60000))} foreground · {formatDuration(Math.round(deviceUsage.screen.screenOnDurationMs / 60000))} screen-on
+                  </strong>
+                  <p className="mt-1 truncate text-[10px] text-slate-600 dark:text-slate-300">{topUsageApp ? `Top app: ${topUsageApp.appName && topUsageApp.appName !== topUsageApp.packageName ? topUsageApp.appName : 'Unknown app'}` : `No per-app data for ${deviceUsage.date}`}</p>
+                  <p className="mt-1 truncate text-[9px] text-slate-500">{deviceUsage.date} · synced {new Date(deviceUsage.syncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                </>
+              ) : <p className="mt-2 text-[10px] text-slate-500">No saved Android usage sync yet.</p>}
+            </div>
+          </article>
+        </div>
         {isAndroidApp() ? (
           <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            This Android build includes Today, Focus, Goals, and Usage widget options. To add one, long-press an empty area of your launcher home screen, choose Widgets, find Solis, then drag the widget onto the screen. Widget content refreshes when Solis data changes and through Android launcher updates; it is not a live second-by-second display.
+            Add one: long-press an empty area of your launcher home screen, choose <strong>Widgets</strong>, select Awake, then drag the widget onto the screen. Each type has its own preview and layout.
           </p>
         ) : (
           <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            Native launcher widgets are Android-only and cannot be added from this web version. Install the Solis Android app, then long-press an empty launcher area and choose Widgets to see available Solis widgets.
+            These are in-app previews only in this browser. Native widgets require the Awake Android app; then long-press an empty launcher area, choose <strong>Widgets</strong>, select Awake, and drag a widget onto the screen.
           </p>
         )}
       </section>
@@ -328,7 +509,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
         <div>
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">Android app-usage tracking</h3>
           <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300 mt-1">
-            Optional. Solis reads Android UsageStats for foreground app time and screen-on/keyguard events. Android records these while Solis is closed or another app is in front; Solis syncs them when opened or returned to the foreground. Data is kept locally and is not added to manual logs or sent to Gemini.
+            Optional. Awake reads Android UsageStats for foreground app time and screen-on/keyguard events. Android records these while Awake is closed or another app is in front; Awake syncs them when opened or returned to the foreground. Data is kept locally and is not added to manual logs or sent to Gemini.
           </p>
         </div>
         {preferences.usageTrackingEnabled ? (
@@ -372,7 +553,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
           Last successful sync: {deviceUsage ? new Date(deviceUsage.syncedAt).toLocaleString() : 'No usage sync saved for the selected day.'}
         </p>
         <div className="rounded-xl bg-slate-50 dark:bg-slate-900/60 p-3 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-          Website tracking is separate. Android app usage only identifies that a browser was used, not the websites visited. Exact site data would require a browser-specific extension or an explicitly configured local VPN/filter integration; Solis does not currently have that integration and will not claim to know visited sites.
+          Website tracking is separate. Android app usage only identifies that a browser was used, not the websites visited. Exact site data would require a browser-specific extension or an explicitly configured local VPN/filter integration; Awake does not currently have that integration and will not claim to know visited sites.
         </div>
       </section>
 
@@ -406,7 +587,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
             <div>
               <strong className="text-xs font-bold text-slate-900 dark:text-white block">Restore from Backup</strong>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                Upload a previous Solis JSON export to restore your historical timeline.
+                Upload a previous Awake JSON export to restore your historical timeline.
               </p>
             </div>
             <label className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold cursor-pointer transition-colors">
@@ -510,7 +691,7 @@ export const PrivacySettingsModal: React.FC<PrivacySettingsProps> = ({
               Allow optional app-usage check-in notifications (Android)
             </label>
             <p className="pl-6 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
-              Off by default. Requires Android Usage Access and app-usage tracking to be enabled. Solis checks app-usage totals locally on an Android-managed, inexact schedule, sends at most one message per day, and does not send usage data to Gemini or identify websites. Check-ins are skipped during quiet hours.
+              Off by default. Requires Android Usage Access and app-usage tracking to be enabled. Awake checks app-usage totals locally on an Android-managed, inexact schedule, sends at most one message per configured interval, and does not send usage data to Gemini or identify websites. Check-ins are skipped during quiet hours.
             </p>
             <label className="block pl-6 text-[11px] font-medium text-slate-700 dark:text-slate-300">
               Check-in threshold

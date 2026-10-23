@@ -37,7 +37,7 @@ import {
   saveStoredDeviceUsage,
   DEFAULT_PREFERENCES,
 } from './utils/storage';
-import { getTodayDateString } from './utils/timeline';
+import { calculateDetailedInsights, formatDuration, getTodayDateString } from './utils/timeline';
 import { checkDeviceUsageAccess, isAndroidApp, openDeviceUsageSettings, readDailyDeviceUsage } from './utils/deviceUsage';
 import { cancelTaskReminder, configureUsageEncouragement, consumePendingTaskReminder, getNativeWallpaperAccent, notifyGoalCompleted, requestReminderPermission, rescheduleTaskAfterCheckin, restoreGrantedWebReminders, scheduleTaskReminder, updateTaskWidget, updateWidgetData } from './utils/taskReminders';
 
@@ -63,7 +63,7 @@ export default function App() {
   const [financeStatus, setFinanceStatus] = useState('');
   const [notificationFeedback, setNotificationFeedback] = useState('');
   const [encouragementStatus, setEncouragementStatus] = useState('');
-  const [reminderStatus, setReminderStatus] = useState('Task reminders are optional. Android reminders can arrive while Solis is closed; browser reminders require Solis to stay open.');
+  const [reminderStatus, setReminderStatus] = useState('Task reminders are optional. Android reminders can arrive while Awake is closed; browser reminders require Awake to stay open.');
   const [deviceUsage, setDeviceUsage] = useState<DailyDeviceUsage | null>(null);
   const [usageStatus, setUsageStatus] = useState('Android app usage tracking is off.');
   const [isUsageRefreshing, setIsUsageRefreshing] = useState(false);
@@ -205,7 +205,7 @@ export default function App() {
   useEffect(() => {
     if (!isLoaded) return;
     void updateTaskWidget(tasks, getTodayDateString()).catch((error) => {
-      console.error('Could not update the Solis home-screen widget', error);
+      console.error('Could not update the Awake home-screen widget', error);
     });
   }, [isLoaded, tasks]);
 
@@ -371,19 +371,28 @@ export default function App() {
     }
     const usage = deviceUsage?.date === date ? deviceUsage : loadStoredDeviceUsage(date);
     const foregroundMinutes = usage?.apps.reduce((sum, app) => sum + app.totalTimeInForegroundMs, 0) ?? 0;
+    const todayStats = calculateDetailedInsights(
+      entries.filter((entry) => entry.date === date),
+      preferences.dailyFocusGoalMinutes,
+      preferences.dailyOfflineGoalMinutes,
+    );
     void updateWidgetData({
+      stats: `Focus ${formatDuration(todayStats.totalFocusMinutes)} · Offline ${formatDuration(todayStats.totalOfflineMinutes)}`,
       nextTask: nextTask ? `${nextTask.time} · ${nextTask.title}` : scheduled.length ? 'You finished today’s plan' : 'No tasks planned yet',
-      progress: scheduled.length ? `${completed} of ${scheduled.length} tasks complete` : 'Add a task in Solis',
+      progress: scheduled.length ? `${completed} of ${scheduled.length} tasks complete` : 'Add a task in Awake',
       goals: savingsGoal.targetAmount > 0
         ? `${savingsGoal.currency ?? 'USD'} ${savingsGoal.currentAmount.toFixed(0)} / ${savingsGoal.targetAmount.toFixed(0)}`
         : 'No savings goal yet',
+      goalsProgress: savingsGoal.targetAmount > 0
+        ? Math.min(100, Math.round((savingsGoal.currentAmount / savingsGoal.targetAmount) * 100))
+        : 0,
       streak: `${streak}-day task-completion streak`,
       usage: usage
         ? `${Math.round(foregroundMinutes / 60000)} min foreground app time · ${Math.round(usage.screen.screenOnDurationMs / 60000)} min screen-on`
         : 'No synced usage yet',
-      lastSync: usage ? `Last sync ${new Date(usage.syncedAt).toLocaleString()}` : 'Sync from Today in Solis',
-    }).catch((error) => console.error('Could not update Solis launcher widget data', error));
-  }, [isLoaded, tasks, savingsGoal, deviceUsage]);
+      lastSync: usage ? `Last sync ${new Date(usage.syncedAt).toLocaleString()}` : 'Sync from Today in Awake',
+    }).catch((error) => console.error('Could not update Awake launcher widget data', error));
+  }, [isLoaded, tasks, savingsGoal, deviceUsage, entries, preferences.dailyFocusGoalMinutes, preferences.dailyOfflineGoalMinutes]);
 
   const syncDeviceUsage = useCallback(async (date: string) => {
     if (usageRefreshInProgress.current) return;
@@ -436,7 +445,7 @@ export default function App() {
     handleUpdatePreferences({ usageTrackingEnabled: true });
     try {
       await openDeviceUsageSettings();
-      setUsageStatus('Android Usage Access settings opened. Allow access for Solis, then return to sync.');
+      setUsageStatus('Android Usage Access settings opened. Allow access for Awake, then return to sync.');
     } catch (error) {
       console.error('Could not open Android Usage Access settings', error);
       setUsageStatus('Could not open Android Usage Access settings. Open Settings → Apps → Special app access → Usage access manually.');
@@ -461,7 +470,7 @@ export default function App() {
         } else if (preferences.usageTrackingEnabled) {
           await syncDeviceUsage(selectedDate);
         } else {
-          setUsageStatus('Usage Access is granted; app-usage tracking is turned off in Solis.');
+          setUsageStatus('Usage Access is granted; app-usage tracking is turned off in Awake.');
         }
       } catch (error) {
         console.error('Could not check Android Usage Access', error);
@@ -531,7 +540,7 @@ export default function App() {
       try {
         const scheduled = await scheduleTaskReminder(task);
         setReminderStatus(scheduled
-          ? `Reminder set for ${task.time}. Solis will ask whether you completed “${task.title}”.`
+          ? `Reminder set for ${task.time}. Awake will ask whether you completed “${task.title}”.`
           : 'Task saved, but its one-time reminder was not scheduled because that time has passed.');
       } catch (error) {
         console.error('Could not schedule task reminder', error);
@@ -630,14 +639,18 @@ export default function App() {
         setActiveTab={setActiveTab}
         selectedDate={selectedDate}
         setSelectedDate={setSelectedDate}
+        preferences={preferences}
+        onUpdatePreferences={handleUpdatePreferences}
       />
 
       {/* Main Content Container */}
       <main
-        className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6"
+        className="touch-pan-y flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-32 space-y-6"
         onTouchStart={(event) => {
           const target = event.target;
-          if (target instanceof Element && target.closest('button, input, select, textarea, [role="slider"]')) {
+          if (target instanceof Element && target.closest(
+            'button, input, select, textarea, [role="slider"], [role="dialog"], [contenteditable="true"], [data-no-tab-swipe], [data-horizontal-scroll], svg, canvas'
+          )) {
             swipeStart.current = null;
             return;
           }
@@ -651,7 +664,7 @@ export default function App() {
           if (!start || !touch) return;
           const deltaX = touch.clientX - start.x;
           const deltaY = Math.abs(touch.clientY - start.y);
-          if (Math.abs(deltaX) < 80 || deltaY > 55 || activeTab === 'settings') return;
+          if (Math.abs(deltaX) < 80 || Math.abs(deltaX) < deltaY * 1.5 || deltaY > 55 || activeTab === 'settings') return;
           const currentIndex = mainTabs.indexOf(activeTab);
           const nextIndex = Math.min(mainTabs.length - 1, Math.max(0, currentIndex + (deltaX < 0 ? 1 : -1)));
           if (nextIndex !== currentIndex) setActiveTab(mainTabs[nextIndex]);
@@ -733,6 +746,9 @@ export default function App() {
             encouragementStatus={encouragementStatus}
             onRequestUsageAccess={handleRequestUsageAccess}
             onSyncDeviceUsage={() => syncDeviceUsage(selectedDate)}
+            tasks={tasks}
+            entries={entries}
+            savingsGoal={savingsGoal}
           />
         )}
       </main>
@@ -740,7 +756,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-200/80 dark:border-slate-800/80 py-5 text-center text-xs text-slate-400 dark:text-slate-500 bg-white/40 dark:bg-slate-900/40">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>Solis • Activity is stored locally; Gemini sharing is optional.</p>
+          <p>Awake • Activity is stored locally; Gemini sharing is optional.</p>
         </div>
       </footer>
     </div>

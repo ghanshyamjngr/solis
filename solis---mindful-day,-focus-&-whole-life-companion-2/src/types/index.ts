@@ -69,10 +69,12 @@ export interface PlannedTask {
 export type ThemeStyle = 'clean-minimal' | 'playful-animated' | 'soft-glass';
 export type AccentColor = 'amber' | 'sage' | 'ocean' | 'lavender' | 'coral' | 'wallpaper';
 export type AppearanceMode = 'system' | 'light' | 'dark';
+export type StatsGraphStyle = 'bar' | 'line' | 'donut';
 
 export interface UserPreferences {
   themeStyle: ThemeStyle;
   accentColor: AccentColor;
+  statsGraphStyle: StatsGraphStyle;
   appearanceMode: AppearanceMode;
   darkMode: boolean;
   soundEnabled: boolean;
@@ -89,6 +91,9 @@ export interface UserPreferences {
   aiDataSharingConsent: boolean;
   aiUsageDataSharingConsent: boolean;
   usageTrackingEnabled: boolean;
+  profileName: string;
+  personalGoals: string;
+  dailyRoutine: string;
 }
 
 export interface DailyHabits {
