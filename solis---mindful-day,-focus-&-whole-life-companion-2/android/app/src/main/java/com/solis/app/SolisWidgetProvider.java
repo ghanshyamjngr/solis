@@ -29,6 +29,11 @@ import java.util.Locale;
 import java.util.Currency;
 
 public class SolisWidgetProvider extends AppWidgetProvider {
+    private static final int[] CHART_COLORS = {
+        Color.rgb(132, 113, 176), Color.rgb(120, 147, 132),
+        Color.rgb(120, 149, 168), Color.rgb(197, 139, 120),
+        Color.rgb(155, 136, 168), Color.rgb(181, 158, 92)
+    };
     private static final String[] PALETTE_NAMES = { "Lavender", "Amber", "Sage", "Ocean" };
     private static final int[] PALETTE_SURFACES = {
         R.drawable.awake_widget_surface, R.drawable.awake_widget_surface_amber,
@@ -44,12 +49,6 @@ public class SolisWidgetProvider extends AppWidgetProvider {
         Color.rgb(113, 97, 139), Color.rgb(166, 105, 24),
         Color.rgb(74, 122, 95), Color.rgb(62, 112, 149)
     };
-    private static final int[] CHART_COLORS = {
-        Color.rgb(132, 113, 176), Color.rgb(120, 147, 132),
-        Color.rgb(120, 149, 168), Color.rgb(197, 139, 120),
-        Color.rgb(155, 136, 168), Color.rgb(181, 158, 92)
-    };
-
     protected String widgetType() {
         return "today";
     }
