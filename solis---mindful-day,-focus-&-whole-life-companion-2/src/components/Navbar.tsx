@@ -229,19 +229,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       Personal goals
                       <textarea maxLength={500} rows={2} value={profileDraft.personalGoals} onChange={(event) => setProfileDraft((draft) => ({ ...draft, personalGoals: event.target.value }))} className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="What would you like to make room for?" />
                     </label>
-                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                      Routine or preferred time
-                      <textarea maxLength={500} rows={2} value={profileDraft.dailyRoutine} onChange={(event) => setProfileDraft((draft) => ({ ...draft, dailyRoutine: event.target.value }))} className="mt-1 w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" placeholder="Optional, e.g. quiet focus in the morning" />
-                    </label>
-                    <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                      Encouragement style
-                      <select value={profileDraft.encouragementTone} onChange={(event) => setProfileDraft((draft) => ({ ...draft, encouragementTone: event.target.value as UserPreferences['encouragementTone'] }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                        <option value="gentle">Gentle</option>
-                        <option value="poetic">Poetic</option>
-                        <option value="practical">Practical</option>
-                        <option value="off">Off</option>
-                      </select>
-                    </label>
                     <button type="button" onClick={saveProfile} className="w-full rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white">Save profile</button>
                     {profileFeedback && <p role="status" className="text-[10px] text-emerald-700 dark:text-emerald-300">{profileFeedback}</p>}
                   </div>
@@ -293,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           const tabs = ['timeline', 'tasks', 'timer', 'finance'] as const;
           const index = tabs.indexOf(activeTab as (typeof tabs)[number]);
           if (index < 0) return;
-          const nextIndex = Math.max(0, Math.min(tabs.length - 1, index + (deltaX < 0 ? 1 : -1)));
+          const nextIndex = Math.max(0, Math.min(tabs.length - 1, index + (deltaX > 0 ? 1 : -1)));
           if (nextIndex !== index) setActiveTab(tabs[nextIndex]);
         }}
       >
