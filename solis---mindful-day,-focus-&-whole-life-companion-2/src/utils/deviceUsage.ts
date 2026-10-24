@@ -8,6 +8,7 @@ interface DeviceUsagePlugin {
     permissionGranted: boolean;
     date: string;
     syncedAt?: number;
+    measurementVersion?: number;
     apps?: DailyDeviceUsage['apps'];
     screen?: DailyDeviceUsage['screen'];
   }>;
@@ -30,10 +31,12 @@ export async function openDeviceUsageSettings(): Promise<void> {
 
 export async function readDailyDeviceUsage(date: string): Promise<DailyDeviceUsage | null> {
   const result = await DeviceUsage.queryDailyUsage({ date });
-  if (!result.permissionGranted || !result.syncedAt || !result.screen) return null;
+  if (!result.permissionGranted || !result.syncedAt || !result.screen
+    || result.measurementVersion !== 2) return null;
   return {
     date: result.date,
     syncedAt: result.syncedAt,
+    measurementVersion: result.measurementVersion,
     apps: result.apps ?? [],
     screen: result.screen,
   };

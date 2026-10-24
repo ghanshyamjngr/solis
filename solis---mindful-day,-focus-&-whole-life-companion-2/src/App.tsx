@@ -6,11 +6,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { SolisMark } from './components/SolisMark';
-import { DailyTimeline } from './components/DailyTimeline';
+import { DailyInsights } from './components/DailyInsights';
 import { FocusTimer } from './components/FocusTimer';
 import { FinancialGoalsView } from './components/FinancialGoalsView';
 import { PrivacySettingsModal } from './components/PrivacySettingsModal';
 import { PlanHub } from './components/PlanHub';
+import { TaskManager } from './components/TaskManager';
 import {
   ActivityEntry,
   DailyDeviceUsage,
@@ -43,7 +44,8 @@ import { cancelTaskReminder, configureUsageEncouragement, consumePendingTaskRemi
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'timeline' | 'tasks' | 'timer' | 'finance' | 'settings'>('timeline');
-  const [planMode, setPlanMode] = useState<'tasks' | 'log'>('tasks');
+  const [planMode, setPlanMode] = useState<'flow' | 'log'>('flow');
+  const [focusMode, setFocusMode] = useState<'timer' | 'tasks'>('timer');
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const mainTabs = ['timeline', 'tasks', 'timer', 'finance'] as const;
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
@@ -65,6 +67,7 @@ export default function App() {
   const [encouragementStatus, setEncouragementStatus] = useState('');
   const [reminderStatus, setReminderStatus] = useState('Task reminders are optional. Android reminders can arrive while Awake is closed; browser reminders require Awake to stay open.');
   const [deviceUsage, setDeviceUsage] = useState<DailyDeviceUsage | null>(null);
+  const [widgetSelectedApp, setWidgetSelectedApp] = useState<{ packageName: string; appName: string } | null>(null);
   const [usageStatus, setUsageStatus] = useState('Android app usage tracking is off.');
   const [isUsageRefreshing, setIsUsageRefreshing] = useState(false);
   const usageRefreshInProgress = useRef(false);
@@ -297,15 +300,79 @@ export default function App() {
     const openCheckin = (taskId: string | null) => {
       if (!taskId) return;
       setPendingTaskId(taskId);
-      setActiveTab('tasks');
+      setFocusMode('tasks');
+      setActiveTab('timer');
     };
     const consumePending = () => void consumePendingTaskReminder()
-      .then(({ taskId, openTasks, widgetAction, answer, answerTaskId, answerDate }) => {
+      .then(({
+        taskId,
+        openTasks,
+        widgetAction,
+        widgetAmount,
+        widgetCategory,
+        widgetAppPackage,
+        widgetAppName,
+        answer,
+        answerTaskId,
+        answerDate,
+      }) => {
         openCheckin(taskId);
-        if (openTasks) setActiveTab('tasks');
-        if (widgetAction === 'focus') setActiveTab('timer');
-        if (widgetAction === 'plan') setActiveTab('tasks');
+        if (openTasks) {
+          setFocusMode('tasks');
+          setActiveTab('timer');
+        }
+        if (widgetAction === 'focus') {
+          setFocusMode('timer');
+          setActiveTab('timer');
+        }
+        if (widgetAction === 'plan') {
+          setPlanMode('flow');
+          setActiveTab('tasks');
+        }
         if (widgetAction === 'today') setActiveTab('timeline');
+        if (widgetAppPackage) {
+          setWidgetSelectedApp({
+            packageName: widgetAppPackage,
+            appName: widgetAppName?.trim() || widgetAppPackage,
+          });
+          setSelectedDate(getTodayDateString());
+          setActiveTab('timeline');
+        }
+        if (widgetAction === 'money') setActiveTab('finance');
+        if (widgetAction === 'money_saved' || widgetAction === 'money_spent') {
+          const amount = Number(widgetAmount);
+          if (Number.isFinite(amount) && amount > 0 && amount <= 1_000_000) {
+            const category = widgetCategory?.trim() || savingsGoal.category || 'Personal';
+            const isSaved = widgetAction === 'money_saved';
+            const entry: FinancialEntry = {
+              id: `widget-fin-${Date.now()}`,
+              source: 'manual',
+              date: getTodayDateString(),
+              amountSaved: amount,
+              note: `Home-screen ${isSaved ? 'saved' : 'spent mindfully'} · ${category}`,
+              type: isSaved ? 'saved' : 'spent_mindfully',
+              createdAt: Date.now(),
+              currency: savingsGoal.currency ?? 'USD',
+            };
+            handleAddFinancialEntry(entry);
+            if (isSaved) {
+              handleUpdateSavingsGoal({
+                ...savingsGoal,
+                currentAmount: savingsGoal.currentAmount + amount,
+              });
+            }
+            setFinanceStatus(
+              `${isSaved ? 'Saved' : 'Spent mindfully'} ${new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: savingsGoal.currency ?? 'USD',
+              }).format(amount)} logged in Awake only; no payment was made.`,
+            );
+            setActiveTab('finance');
+          } else {
+            console.error('The money widget supplied an invalid quick-action amount.');
+            setFinanceStatus('The home-screen entry could not be logged because its amount was invalid.');
+          }
+        }
         if (answer && answerTaskId && answerDate) {
           setTasks((current) => {
             const updated = current.map((task) => {
@@ -330,7 +397,8 @@ export default function App() {
             return updated;
           });
           setPendingTaskId(answerTaskId);
-          setActiveTab('tasks');
+          setFocusMode('tasks');
+          setActiveTab('timer');
           setReminderStatus(`Saved your reminder response: ${answer}.`);
         }
       })
@@ -349,7 +417,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('solis-task-reminder', onWebReminder);
     };
-  }, [isLoaded]);
+  }, [isLoaded, savingsGoal, financialEntries, preferences]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -376,6 +444,28 @@ export default function App() {
       preferences.dailyFocusGoalMinutes,
       preferences.dailyOfflineGoalMinutes,
     );
+    const focusHistory = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(`${date}T12:00:00`);
+      day.setDate(day.getDate() - (6 - index));
+      const dayKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      const dayEntries = entries.filter((entry) => entry.date === dayKey && entry.source !== 'demo');
+      return {
+        label: day.toLocaleDateString(undefined, { weekday: 'short' }),
+        date: dayKey,
+        focusMinutes: calculateDetailedInsights(
+          dayEntries,
+          preferences.dailyFocusGoalMinutes,
+          preferences.dailyOfflineGoalMinutes,
+        ).totalFocusMinutes,
+      };
+    });
+    const usageApps = usage?.apps.map((app) => ({
+      packageName: app.packageName,
+      appName: app.appName,
+      appIconDataUrl: app.appIconDataUrl,
+      totalTimeInForegroundMs: app.totalTimeInForegroundMs,
+      isSystemApp: app.isSystemApp === true,
+    })) ?? [];
     void updateWidgetData({
       stats: `Focus ${formatDuration(todayStats.totalFocusMinutes)} · Offline ${formatDuration(todayStats.totalOfflineMinutes)}`,
       nextTask: nextTask ? `${nextTask.time} · ${nextTask.title}` : scheduled.length ? 'You finished today’s plan' : 'No tasks planned yet',
@@ -383,16 +473,24 @@ export default function App() {
       goals: savingsGoal.targetAmount > 0
         ? `${savingsGoal.currency ?? 'USD'} ${savingsGoal.currentAmount.toFixed(0)} / ${savingsGoal.targetAmount.toFixed(0)}`
         : 'No savings goal yet',
+      goalsTitle: savingsGoal.targetAmount > 0 ? savingsGoal.title : '',
+      goalsCategory: savingsGoal.category,
+      goalsCurrency: savingsGoal.currency ?? 'USD',
       goalsProgress: savingsGoal.targetAmount > 0
         ? Math.min(100, Math.round((savingsGoal.currentAmount / savingsGoal.targetAmount) * 100))
         : 0,
       streak: `${streak}-day task-completion streak`,
       usage: usage
-        ? `${Math.round(foregroundMinutes / 60000)} min foreground app time · ${Math.round(usage.screen.screenOnDurationMs / 60000)} min screen-on`
+        ? `${formatDuration(foregroundMinutes / 60000)} app foreground · ${formatDuration(usage.screen.screenOnDurationMs / 60000)} screen-on`
         : 'No synced usage yet',
       lastSync: usage ? `Last sync ${new Date(usage.syncedAt).toLocaleString()}` : 'Sync from Today in Awake',
+      focusHistory: JSON.stringify(focusHistory),
+      usageApps: JSON.stringify(usageApps),
+      screenOnDurationMs: usage?.screen.screenOnDurationMs ?? 0,
+      usageSyncedAt: usage?.syncedAt ?? 0,
+      usageTrackingEnabled: preferences.usageTrackingEnabled,
     }).catch((error) => console.error('Could not update Awake launcher widget data', error));
-  }, [isLoaded, tasks, savingsGoal, deviceUsage, entries, preferences.dailyFocusGoalMinutes, preferences.dailyOfflineGoalMinutes]);
+  }, [isLoaded, tasks, savingsGoal, deviceUsage, entries, financialEntries, preferences.dailyFocusGoalMinutes, preferences.dailyOfflineGoalMinutes, preferences.usageTrackingEnabled]);
 
   const syncDeviceUsage = useCallback(async (date: string) => {
     if (usageRefreshInProgress.current) return;
@@ -420,7 +518,7 @@ export default function App() {
 
       const usage = await readDailyDeviceUsage(date);
       if (!usage) {
-        setUsageStatus('Android did not return usage data for this date. Try syncing again later.');
+        setUsageStatus('Android usage data was unavailable or the installed Android app needs an update to provide normalized usage. Update Awake and sync again.');
         return;
       }
       saveStoredDeviceUsage(usage);
@@ -638,6 +736,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         selectedDate={selectedDate}
+        selectedAppPackage={widgetSelectedApp?.packageName}
+        selectedAppName={widgetSelectedApp?.appName}
         setSelectedDate={setSelectedDate}
         preferences={preferences}
         onUpdatePreferences={handleUpdatePreferences}
@@ -664,7 +764,7 @@ export default function App() {
           if (!start || !touch) return;
           const deltaX = touch.clientX - start.x;
           const deltaY = Math.abs(touch.clientY - start.y);
-          if (Math.abs(deltaX) < 80 || Math.abs(deltaX) < deltaY * 1.5 || deltaY > 55 || activeTab === 'settings') return;
+          if (Math.abs(deltaX) < 64 || Math.abs(deltaX) < deltaY * 1.35 || activeTab === 'settings') return;
           const currentIndex = mainTabs.indexOf(activeTab);
           const nextIndex = Math.min(mainTabs.length - 1, Math.max(0, currentIndex + (deltaX < 0 ? 1 : -1)));
           if (nextIndex !== currentIndex) setActiveTab(mainTabs[nextIndex]);
@@ -677,8 +777,70 @@ export default function App() {
           </div>
         )}
         {activeTab === 'timeline' && (
-          <DailyTimeline
-            date={selectedDate}
+          <DailyInsights
+            entries={entries.filter((entry) => entry.source !== 'demo')}
+            tasks={tasks}
+            deviceUsage={selectedDeviceUsage}
+            usageTrackingEnabled={preferences.usageTrackingEnabled}
+            usageStatus={usageStatus}
+            isUsageRefreshing={isUsageRefreshing}
+            onRefreshUsage={() => syncDeviceUsage(selectedDate)}
+            selectedDate={selectedDate}
+            preferences={preferences}
+            onStartFocus={() => setActiveTab('timer')}
+            onLogOffline={() => {
+              setPlanMode('log');
+              setActiveTab('tasks');
+            }}
+          />
+        )}
+
+        {activeTab === 'timer' && (
+          <>
+            <div className="mx-auto flex w-fit rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" aria-label="Focus tools">
+              <button
+                type="button"
+                onClick={() => setFocusMode('timer')}
+                aria-pressed={focusMode === 'timer'}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold ${focusMode === 'timer' ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                Focus Timer
+              </button>
+              <button
+                type="button"
+                onClick={() => setFocusMode('tasks')}
+                aria-pressed={focusMode === 'tasks'}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold ${focusMode === 'tasks' ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}
+              >
+                Tasks
+              </button>
+            </div>
+            {focusMode === 'timer' ? (
+              <FocusTimer
+                preferences={preferences}
+                onSaveSession={handleSaveActivity}
+                onViewTimeline={() => setActiveTab('timeline')}
+              />
+            ) : (
+              <TaskManager
+                selectedDate={selectedDate}
+                tasks={tasks}
+                reminderStatus={reminderStatus}
+                pendingTaskId={pendingTaskId}
+                onAddTask={handleAddTask}
+                onToggleTask={handleToggleTask}
+                onDeleteTask={handleDeleteTask}
+                onDismissCheckin={() => setPendingTaskId(null)}
+              />
+            )}
+          </>
+        )}
+
+        {activeTab === 'tasks' && (
+          <PlanHub
+            mode={planMode}
+            onModeChange={setPlanMode}
+            selectedDate={selectedDate}
             entries={entries}
             tasks={tasks}
             deviceUsage={selectedDeviceUsage}
@@ -688,37 +850,9 @@ export default function App() {
             onRefreshUsage={() => syncDeviceUsage(selectedDate)}
             preferences={preferences}
             onDeleteEntry={handleDeleteActivity}
-            onNavigateToLog={() => {
-              setPlanMode('log');
-              setActiveTab('tasks');
-            }}
-            onNavigateToTimer={() => setActiveTab('timer')}
-          />
-        )}
-
-        {activeTab === 'timer' && (
-          <FocusTimer
-            preferences={preferences}
-            onSaveSession={handleSaveActivity}
-            onViewTimeline={() => setActiveTab('timeline')}
-          />
-        )}
-
-        {activeTab === 'tasks' && (
-          <PlanHub
-            mode={planMode}
-            onModeChange={setPlanMode}
-            selectedDate={selectedDate}
-            tasks={tasks}
-            reminderStatus={reminderStatus}
-            pendingTaskId={pendingTaskId}
-            preferences={preferences}
-            onAddTask={handleAddTask}
-            onToggleTask={handleToggleTask}
-            onDeleteTask={handleDeleteTask}
-            onDismissCheckin={() => setPendingTaskId(null)}
             onSaveEntry={handleSaveActivity}
             onViewToday={() => setActiveTab('timeline')}
+            onViewFocus={() => setActiveTab('timer')}
           />
         )}
 

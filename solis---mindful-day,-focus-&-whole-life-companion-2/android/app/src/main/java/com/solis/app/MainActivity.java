@@ -27,7 +27,19 @@ public class MainActivity extends BridgeActivity {
         if (taskId != null && !taskId.isEmpty()) editor.putString("pending_checkin", taskId);
         if (intent.getBooleanExtra("solisOpenTasks", false)) editor.putBoolean("pending_open_tasks", true);
         String widgetAction = intent.getStringExtra("solisWidgetAction");
-        if (widgetAction != null) editor.putString("pending_widget_action", widgetAction);
+        if (widgetAction != null) {
+            editor.putString("pending_widget_action", widgetAction);
+            if (intent.hasExtra("solisWidgetAmount")) {
+                editor.putString("pending_widget_amount",
+                    Double.toString(intent.getDoubleExtra("solisWidgetAmount", 0)));
+            }
+            String category = intent.getStringExtra("solisWidgetCategory");
+            if (category != null) editor.putString("pending_widget_category", category);
+            String appPackage = intent.getStringExtra("solisWidgetAppPackage");
+            if (appPackage != null) editor.putString("pending_widget_app_package", appPackage);
+            String appName = intent.getStringExtra("solisWidgetAppName");
+            if (appName != null) editor.putString("pending_widget_app_name", appName);
+        }
         if (intent.getBooleanExtra("solisOpenFocus", false)) editor.putString("pending_widget_action", "focus");
         String reminderAnswer = intent.getStringExtra("solisTaskReminderAnswer");
         if (reminderAnswer != null) editor.putString("pending_answer", reminderAnswer);

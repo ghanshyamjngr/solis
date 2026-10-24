@@ -3,45 +3,80 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/awake_widget_surface"
-    android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
     <TextView
         android:id="@+id/solis_widget_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="AWAKE · TODAY STATS"
-        android:textColor="#FF5B668B"
-        android:textSize="11sp"
-        android:textStyle="bold" />
-    <TextView
-        android:id="@+id/solis_widget_task"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:maxLines="1"
-        android:text="Focus 0m · Offline 0m"
-        android:textColor="#FF312B42"
-        android:textSize="18sp"
+        android:text="AWAKE · FOCUS STATS"
+        android:textColor="#FF5B668B"
+        android:textSize="11sp"
         android:textStyle="bold" />
     <TextView
         android:id="@+id/solis_widget_progress"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Focus time · Last 7 days"
+        android:textColor="#FF77738A"
+        android:textSize="10sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_marginTop="5dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="No tasks planned yet"
-        android:textColor="#FF696579"
-        android:textSize="12sp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_0" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Mon" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_0" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_0" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_1" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Tue" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_1" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_1" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_2" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Wed" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_2" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_2" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_3" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Thu" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_3" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_3" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_4" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Fri" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_4" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_4" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_5" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Sat" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_5" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_5" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:id="@+id/focus_day_6" android:layout_width="34dp" android:layout_height="wrap_content" android:text="Sun" android:textColor="#FF696579" android:textSize="9sp" />
+            <ProgressBar android:id="@+id/focus_bar_6" style="?android:attr/progressBarStyleHorizontal" android:layout_width="0dp" android:layout_height="6dp" android:layout_weight="1" android:max="100" android:progress="0" android:progressBackgroundTint="#FFE7E7EE" android:progressTint="#FF8471B0" />
+            <TextView android:id="@+id/focus_value_6" android:layout_width="52dp" android:gravity="end" android:layout_height="wrap_content" android:text="0m" android:textColor="#FF312B42" android:textSize="9sp" android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
     <TextView
-        android:id="@+id/solis_widget_action_label"
+        android:id="@+id/solis_widget_task"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="Add a task to see your plan"
-        android:textColor="#FF77738A"
-        android:textSize="10sp" />
+        android:text="Tap for insights"
+        android:textColor="#FF5B668B"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_action_label"
+        android:layout_width="wrap_content"
+        android:layout_height="1dp"
+        android:text="" />
 </LinearLayout>

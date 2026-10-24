@@ -5,12 +5,12 @@
     android:background="@drawable/awake_widget_surface"
     android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
     <TextView
         android:id="@+id/solis_widget_title"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="AWAKE · FOCUS"
+        android:text="AWAKE · ACTIVE FOCUS"
         android:textColor="#FF71618B"
         android:textSize="11sp"
         android:textStyle="bold" />
@@ -19,7 +19,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
+        android:ellipsize="end"
         android:gravity="center"
+        android:maxLines="1"
         android:text="25:00"
         android:textColor="#FF312B42"
         android:textSize="28sp"
@@ -30,21 +32,65 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:maxLines="1"
-        android:text="Ready when you are"
+        android:text="Ready to focus"
         android:textColor="#FF696579"
-        android:textSize="12sp" />
+        android:textSize="11sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/solis_focus_start"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="#FFE8E2F4"
+            android:gravity="center"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="7dp"
+            android:text="Start"
+            android:textColor="#FF594B72"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/solis_focus_toggle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="4dp"
+            android:layout_weight="1"
+            android:background="#FFE8E2F4"
+            android:gravity="center"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="7dp"
+            android:text="Pause"
+            android:textColor="#FF594B72"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/solis_focus_stop"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="#FFF7E7E8"
+            android:gravity="center"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="7dp"
+            android:text="Stop"
+            android:textColor="#FF9B4D58"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
     <TextView
         android:id="@+id/solis_widget_action_label"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="7dp"
-        android:background="#FFE8E2F4"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
-        android:paddingVertical="6dp"
-        android:text="Start focus"
-        android:textColor="#FF594B72"
-        android:textSize="11sp"
-        android:textStyle="bold" />
+        android:gravity="center"
+        android:maxLines="1"
+        android:text="Focus session"
+        android:textColor="#FF77738A"
+        android:textSize="9sp" />
 </LinearLayout>

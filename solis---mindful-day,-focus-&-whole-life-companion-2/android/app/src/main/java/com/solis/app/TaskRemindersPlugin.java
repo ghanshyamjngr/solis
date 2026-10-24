@@ -163,13 +163,25 @@ public class TaskRemindersPlugin extends Plugin {
     public void updateWidget(PluginCall call) {
         android.content.SharedPreferences.Editor editor =
             getContext().getSharedPreferences("solis_home_widget", Context.MODE_PRIVATE).edit();
-        String[] keys = { "stats", "nextTask", "progress", "focus", "focusAction", "goals", "streak", "usage", "lastSync" };
+        String[] keys = {
+            "stats", "nextTask", "progress", "focus", "focusAction", "goals",
+            "goalsTitle", "goalsCategory", "goalsCurrency", "streak", "usage",
+            "lastSync", "focusHistory", "usageApps"
+        };
         for (String key : keys) {
             String value = call.getString(key);
             if (value != null) editor.putString(key, value);
         }
         Integer goalsProgress = call.getInt("goalsProgress");
         if (goalsProgress != null) editor.putInt("goalsProgress", Math.max(0, Math.min(100, goalsProgress)));
+        Long screenOnDurationMs = call.getLong("screenOnDurationMs");
+        if (screenOnDurationMs != null) {
+            editor.putLong("screenOnDurationMs", Math.max(0, screenOnDurationMs));
+        }
+        Long usageSyncedAt = call.getLong("usageSyncedAt");
+        if (usageSyncedAt != null) editor.putLong("usageSyncedAt", Math.max(0, usageSyncedAt));
+        Boolean usageTrackingEnabled = call.getBoolean("usageTrackingEnabled");
+        if (usageTrackingEnabled != null) editor.putBoolean("usageTrackingEnabled", usageTrackingEnabled);
         editor.apply();
         SolisWidgetProvider.updateAllWidgets(getContext());
         JSObject result = new JSObject();
@@ -325,6 +337,10 @@ public class TaskRemindersPlugin extends Plugin {
         String taskId = preferences.getString("pending_checkin", null);
         boolean openTasks = preferences.getBoolean("pending_open_tasks", false);
         String widgetAction = preferences.getString("pending_widget_action", null);
+        String widgetAmount = preferences.getString("pending_widget_amount", null);
+        String widgetCategory = preferences.getString("pending_widget_category", null);
+        String widgetAppPackage = preferences.getString("pending_widget_app_package", null);
+        String widgetAppName = preferences.getString("pending_widget_app_name", null);
         String answer = preferences.getString("pending_answer", null);
         String answerId = preferences.getString("pending_answer_id", null);
         String answerDate = preferences.getString("pending_answer_date", null);
@@ -332,10 +348,22 @@ public class TaskRemindersPlugin extends Plugin {
         if (taskId != null) result.put("taskId", taskId);
         result.put("openTasks", openTasks);
         if (widgetAction != null) result.put("widgetAction", widgetAction);
+        if (widgetAmount != null) {
+            try {
+                result.put("widgetAmount", Double.parseDouble(widgetAmount));
+            } catch (NumberFormatException exception) {
+                android.util.Log.e("SolisWidget", "Ignoring invalid pending money-widget amount.", exception);
+            }
+        }
+        if (widgetCategory != null) result.put("widgetCategory", widgetCategory);
+        if (widgetAppPackage != null) result.put("widgetAppPackage", widgetAppPackage);
+        if (widgetAppName != null) result.put("widgetAppName", widgetAppName);
         if (answer != null) result.put("answer", answer);
         if (answerId != null) result.put("answerTaskId", answerId);
         if (answerDate != null) result.put("answerDate", answerDate);
         preferences.edit().remove("pending_checkin").remove("pending_open_tasks").remove("pending_widget_action")
+            .remove("pending_widget_amount").remove("pending_widget_category")
+            .remove("pending_widget_app_package").remove("pending_widget_app_name")
             .remove("pending_answer").remove("pending_answer_id").remove("pending_answer_date").apply();
         call.resolve(result);
     }

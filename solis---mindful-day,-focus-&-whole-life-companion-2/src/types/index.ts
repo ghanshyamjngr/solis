@@ -47,6 +47,7 @@ export interface TrackedScreenUsage {
 export interface DailyDeviceUsage {
   date: string;
   syncedAt: number;
+  measurementVersion?: number;
   apps: TrackedAppUsage[];
   screen: TrackedScreenUsage;
 }
@@ -92,6 +93,11 @@ export interface UserPreferences {
   aiUsageDataSharingConsent: boolean;
   usageTrackingEnabled: boolean;
   profileName: string;
+  firstName: string;
+  lastName: string;
+  profilePhotoDataUrl: string;
+  profilePhotoPositionX: number;
+  profilePhotoPositionY: number;
   personalGoals: string;
   dailyRoutine: string;
 }

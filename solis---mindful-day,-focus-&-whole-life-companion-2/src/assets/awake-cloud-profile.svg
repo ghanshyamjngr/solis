@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="background" cx="0" cy="0" r="1" gradientTransform="matrix(0 512 -512 0 256 0)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff"/>
+    </radialGradient>
+    <linearGradient id="cloud" x1="256" x2="256" y1="132" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD3DD"/>
+      <stop offset=".55" stop-color="#F6B4C3"/>
+      <stop offset="1" stop-color="#E99BAD"/>
+    </linearGradient>
+    <linearGradient id="arm" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#F9C1CE"/>
+      <stop offset="1" stop-color="#E99BAD"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="matrix(0 101 -153 0 192 171)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4F6" stop-opacity=".78"/>
+      <stop offset="1" stop-color="#FFF4F6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" width="1.5" height="2" x="-.25" y="-.45" color-interpolation-filters="sRGB" filterUnits="objectBoundingBox">
+      <feGaussianBlur stdDeviation="13"/>
+    </filter>
+    <filter id="soft-shadow" width="1.3" height="1.4" x="-.15" y="-.15" color-interpolation-filters="sRGB" filterUnits="objectBoundingBox">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <path fill="url(#background)" d="M0 0h512v512H0z"/>
+  <ellipse cx="256" cy="412" fill="#8D6170" fill-opacity=".17" filter="url(#shadow)" rx="120" ry="17"/>
+  <ellipse cx="256" cy="407" fill="#9C6876" fill-opacity=".1" filter="url(#soft-shadow)" rx="91" ry="8"/>
+
+  <path fill="url(#cloud)" stroke="#E8A2B1" stroke-opacity=".45" stroke-width="2"
+    d="M157 354c-39 0-70-29-70-66 0-33 25-60 59-65 4-50 45-89 96-89 39 0 72 22 88 55 7-3 15-4 23-4 37 0 67 29 67 65 0 11-3 22-8 31 21 10 35 30 35 53 0 34-29 61-65 61H157c-36 0-65-27-65-61"/>
+  <path fill="url(#shine)" d="M117 280c-3-58 44-116 108-116 44 0 78 24 91 58-26-9-52-7-79 0-39 10-73 39-120 58Z"/>
+
+  <path fill="url(#arm)" d="M158 331c-17-8-35-5-42 8-8 15 2 33 21 42 18 8 38 3 44-11 6-13-5-31-23-39Z"/>
+  <path fill="url(#arm)" d="M354 331c17-8 35-5 42 8 8 15-2 33-21 42-18 8-38 3-44-11-6-13 5-31 23-39Z"/>
+  <path stroke="#D98296" stroke-linecap="round" stroke-opacity=".52" stroke-width="3" d="M150 352c6 5 13 8 20 8m192-8c-6 5-13 8-20 8"/>
+
+  <ellipse cx="204" cy="268" fill="#47313A" rx="7" ry="10"/>
+  <ellipse cx="309" cy="268" fill="#47313A" rx="7" ry="10"/>
+  <ellipse cx="202" cy="265" fill="#fff" fill-opacity=".72" rx="2" ry="2.7"/>
+  <ellipse cx="307" cy="265" fill="#fff" fill-opacity=".72" rx="2" ry="2.7"/>
+  <ellipse cx="169" cy="294" fill="#E9879F" fill-opacity=".48" rx="19" ry="10"/>
+  <ellipse cx="345" cy="294" fill="#E9879F" fill-opacity=".48" rx="19" ry="10"/>
+  <path stroke="#68434E" stroke-linecap="round" stroke-width="4" d="M244 288c4 7 9 11 13 11s9-4 13-11"/>
+</svg>

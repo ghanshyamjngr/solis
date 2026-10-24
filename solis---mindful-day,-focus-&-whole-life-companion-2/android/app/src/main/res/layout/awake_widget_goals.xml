@@ -5,12 +5,12 @@
     android:background="@drawable/awake_widget_surface"
     android:gravity="center_vertical"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="14dp">
     <TextView
         android:id="@+id/solis_widget_title"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="AWAKE · GOALS &amp; STREAK"
+        android:text="AWAKE · MONEY"
         android:textColor="#FF5F806F"
         android:textSize="11sp"
         android:textStyle="bold" />
@@ -18,19 +18,27 @@
         android:id="@+id/solis_widget_task"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="7dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:text="No savings goal yet"
         android:textColor="#FF312B42"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
+    <TextView
+        android:id="@+id/solis_widget_category"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Personal"
+        android:textColor="#FF696579"
+        android:textSize="10sp" />
     <ProgressBar
         android:id="@+id/solis_widget_goal_progress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="7dp"
-        android:layout_marginTop="9dp"
+        android:layout_marginTop="7dp"
         android:indeterminate="false"
         android:max="100"
         android:progress="0"
@@ -40,15 +48,51 @@
         android:id="@+id/solis_widget_progress"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
+        android:layout_marginTop="4dp"
         android:maxLines="1"
-        android:text="0-day task-completion streak"
+        android:text="0 of 0 saved"
         android:textColor="#FF696579"
-        android:textSize="12sp" />
+        android:textSize="10sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/solis_money_add"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="#FFE5F0E8"
+            android:gravity="center"
+            android:paddingVertical="7dp"
+            android:text="+ Save"
+            android:textColor="#FF3D6F51"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/solis_money_spend"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="#FFF7E7E8"
+            android:gravity="center"
+            android:paddingVertical="7dp"
+            android:text="− Spent"
+            android:textColor="#FF9B4D58"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
     <TextView
         android:id="@+id/solis_widget_action_label"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="1sp" />
+        android:layout_marginTop="4dp"
+        android:maxLines="2"
+        android:text="Awake log only · no payment"
+        android:textColor="#FF77738A"
+        android:textSize="8sp" />
 </LinearLayout>

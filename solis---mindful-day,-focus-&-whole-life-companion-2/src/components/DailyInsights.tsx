@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import { ActivityCategory, ActivityEntry, AiDailyReflection, DailyDeviceUsage, PlannedTask, StatsGraphStyle, UserPreferences } from '../types';
-import { calculateDetailedInsights, formatDuration } from '../utils/timeline';
+import { calculateDetailedInsights, formatDuration, getTodayDateString } from '../utils/timeline';
 import { loadRecentStoredDeviceUsage } from '../utils/storage';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') ?? '';
@@ -177,6 +177,8 @@ interface DailyInsightsProps {
   isUsageRefreshing: boolean;
   onRefreshUsage: () => void;
   selectedDate: string;
+  selectedAppPackage?: string;
+  selectedAppName?: string;
   preferences: UserPreferences;
   onStartFocus?: () => void;
   onLogOffline?: () => void;
@@ -191,6 +193,8 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   isUsageRefreshing,
   onRefreshUsage,
   selectedDate,
+  selectedAppPackage,
+  selectedAppName,
   preferences,
   onStartFocus,
   onLogOffline,
@@ -203,6 +207,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   const [suggestionResponse, setSuggestionResponse] = useState<SuggestionResponse | null>(null);
   const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
   const [editedSummary, setEditedSummary] = useState('');
+  const navigationSwipeStart = React.useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -214,6 +219,18 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
       setSuggestionResponse(null);
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (!selectedAppPackage) return;
+    if (deviceUsage?.apps.some((app) => app.packageName === selectedAppPackage && app.isSystemApp)) {
+      setShowSystemApps(true);
+    }
+    const timer = window.setTimeout(() => {
+      document.getElementById(`usage-app-${selectedAppPackage}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [selectedAppPackage, selectedDate, deviceUsage]);
 
   const recordSuggestionResponse = (response: SuggestionResponse) => {
     try {
@@ -236,6 +253,9 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
   const dayEntries = entries.filter((e) => e.date === selectedDate);
   const recentDeviceUsage = loadRecentStoredDeviceUsage(selectedDate, 7);
   const latestDeviceSync = [...recentDeviceUsage].sort((a, b) => b.syncedAt - a.syncedAt)[0];
+  const usageCacheIsStale = Boolean(deviceUsage
+    && selectedDate === getTodayDateString()
+    && Date.now() - deviceUsage.syncedAt > 15 * 60 * 1000);
   const firstContextDate = new Date(`${selectedDate}T12:00:00`);
   firstContextDate.setDate(firstContextDate.getDate() - 3);
   const contextStartDate = `${firstContextDate.getFullYear()}-${String(firstContextDate.getMonth() + 1).padStart(2, '0')}-${String(firstContextDate.getDate()).padStart(2, '0')}`;
@@ -279,6 +299,10 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
     preferences.dailyFocusGoalMinutes,
     preferences.dailyOfflineGoalMinutes
   );
+  const profileDisplayName = [preferences.firstName, preferences.lastName]
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .join(' ') || preferences.profileName.trim();
   const recentStats = calculateDetailedInsights(
     contextEntries,
     preferences.dailyFocusGoalMinutes,
@@ -326,8 +350,8 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
     } else if (preferences.dailyRoutine.trim()) {
       gentleNudge = `A gentle option that fits your routine: ${preferences.dailyRoutine.trim()}.`;
     }
-    if (preferences.profileName.trim()) {
-      summary = `${preferences.profileName.trim()}, ${summary.charAt(0).toLowerCase()}${summary.slice(1)}`;
+    if (profileDisplayName) {
+      summary = `${profileDisplayName}, ${summary.charAt(0).toLowerCase()}${summary.slice(1)}`;
     }
 
     return {
@@ -386,8 +410,8 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
           } else if (preferences.dailyRoutine.trim()) {
             insight.gentleNudge = `A gentle option that fits your routine: ${preferences.dailyRoutine.trim()}.`;
           }
-          if (preferences.profileName.trim()) {
-            insight.summary = `${preferences.profileName.trim()}, ${insight.summary.charAt(0).toLowerCase()}${insight.summary.slice(1)}`;
+          if (profileDisplayName) {
+            insight.summary = `${profileDisplayName}, ${insight.summary.charAt(0).toLowerCase()}${insight.summary.slice(1)}`;
           }
           setAiInsight(insight);
           setAiStatus('Gemini suggestion based on the sharing options you enabled. Tracked facts remain separate.');
@@ -414,6 +438,8 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
     preferences.aiUsageDataSharingConsent,
     preferences.encouragementTone,
     preferences.profileName,
+    preferences.firstName,
+    preferences.lastName,
     preferences.personalGoals,
     preferences.dailyRoutine,
   ]);
@@ -450,11 +476,13 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
             <TrendingUp className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              Daily Insights & Activity Breakdown
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {formatDuration(stats.totalTrackedMinutes)} manually logged
-              </span>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2">
+              {profileDisplayName ? `${profileDisplayName}’s insight overview` : 'Daily Insights & Activity Breakdown'}
+              {stats.totalTrackedMinutes > 0 && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                  {formatDuration(stats.totalTrackedMinutes)} manually logged
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Clear, encouraging overview of focus depth and whole-life activity types.
@@ -495,13 +523,13 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">Android app usage · Tracked separately</h4>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                  UsageStats reports foreground app time; screen-on events are not touch-level interaction.
+                  Foreground app time uses bounded Android activity intervals. Screen-on time is a separate device-event measurement, not touch-level interaction.
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
                   {deviceUsage
-                    ? `Last sync ${new Date(deviceUsage.syncedAt).toLocaleString()}${usageTrackingEnabled ? '' : ' · tracking off'}`
+                    ? `Last sync ${new Date(deviceUsage.syncedAt).toLocaleString()}${usageTrackingEnabled ? '' : ' · tracking off'}${usageCacheIsStale ? ' · cached; refresh recommended' : ''}`
                     : latestDeviceSync
                       ? `Last successful sync ${latestDeviceSync.date} · ${new Date(latestDeviceSync.syncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · selected day not synced`
                       : usageTrackingEnabled ? 'Not synced yet' : 'Tracking off'}
@@ -529,7 +557,7 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
               </p>
             ) : (
               <>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300" role="status">{isUsageRefreshing ? 'Refreshing Android usage…' : usageStatus} · Pull down to refresh</p>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300" role="status">{isUsageRefreshing ? 'Refreshing Android usage…' : usageStatus}{usageCacheIsStale && !isUsageRefreshing ? ' · Showing cached data until refresh completes.' : ''} · Pull down to refresh</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-white/80 dark:bg-slate-900/60 p-3">
                     <span className="block text-[10px] text-slate-500 dark:text-slate-400">Screen-on time</span>
@@ -548,7 +576,11 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                   <>
                   <div className="rounded-xl bg-white/70 p-3 dark:bg-slate-900/40">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Top apps · foreground time</h5>
+                      <h5 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {selectedAppPackage
+                          ? `${selectedAppName || 'Selected app'} · foreground details`
+                          : 'Top apps · foreground time'}
+                      </h5>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400">{preferences.statsGraphStyle} chart</span>
                     </div>
                     <UsageChart
@@ -570,7 +602,13 @@ export const DailyInsights: React.FC<DailyInsightsProps> = ({
                       .filter((app) => showSystemApps || !app.isSystemApp)
                       .sort((a, b) => b.totalTimeInForegroundMs - a.totalTimeInForegroundMs)
                       .map((app) => (
-                        <li key={app.packageName} data-no-tab-swipe="true" className="flex items-center justify-between gap-3 py-2 text-xs">
+                        <li
+                          key={app.packageName}
+                          id={`usage-app-${app.packageName}`}
+                          aria-current={selectedAppPackage === app.packageName ? 'true' : undefined}
+                          data-no-tab-swipe="true"
+                          className={`flex items-center justify-between gap-3 rounded-lg py-2 text-xs ${selectedAppPackage === app.packageName ? 'bg-sky-100/70 px-2 dark:bg-slate-800' : ''}`}
+                        >
                           <span className="flex min-w-0 flex-1 items-center gap-2">
                             {app.appIconDataUrl ? <img src={app.appIconDataUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain" /> : (
                               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sky-100 text-[10px] font-bold text-sky-800 dark:bg-slate-700 dark:text-sky-200" aria-hidden="true">

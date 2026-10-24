@@ -19,15 +19,27 @@ interface TaskRemindersPlugin {
     focus: string;
     focusAction: string;
     goals: string;
+    goalsTitle: string;
+    goalsCategory: string;
+    goalsCurrency: string;
     goalsProgress: number;
     streak: string;
     usage: string;
     lastSync: string;
+    focusHistory: string;
+    usageApps: string;
+    screenOnDurationMs: number;
+    usageSyncedAt: number;
+    usageTrackingEnabled: boolean;
   }>): Promise<void>;
   consumePendingReminder(): Promise<{
     taskId?: string;
     openTasks?: boolean;
     widgetAction?: string;
+    widgetAmount?: number;
+    widgetCategory?: string;
+    widgetAppPackage?: string;
+    widgetAppName?: string;
     answer?: 'completed' | 'postponed' | 'skipped';
     answerTaskId?: string;
     answerDate?: string;

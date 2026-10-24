@@ -30,6 +30,10 @@
             </intent-filter>
 
         </activity>
+        <activity
+            android:name=".WidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/AppTheme.NoActionBar" />
 
         <receiver
             android:name=".TaskReminderReceiver"

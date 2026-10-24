@@ -57,14 +57,17 @@ reflection fallback, but Gemini insights will not be reachable.
 
 ### Optional Android app-usage tracking
 
-In Solis Settings, choose **Enable tracking and open Usage Access**, then grant
-Solis access in Android's Usage Access settings. Solis reads Android
-`UsageStatsManager` foreground-app totals and screen-on/keyguard events. Android
-records usage while Solis is closed or another app is in front; Solis syncs the
-OS report when the app is opened or returns to the foreground. The report is
-stored locally and kept separate from manually logged activities and Gemini
-requests. Turning tracking off stops future reads without deleting saved
-snapshots; use the existing data wipe control to remove local records.
+In Awake Settings, choose **Enable tracking and open Usage Access**, then grant
+Awake access in Android's Usage Access settings. Awake calculates foreground
+time from bounded Android activity foreground/background events, clips it to
+the selected local day, and intersects it with screen-on intervals when those
+events are available. Screen-on duration and summed per-app foreground
+duration are distinct measurements. Android records usage while Awake is
+closed or another app is in front; Awake syncs when opened or returned to the
+foreground. Normalized reports are stored locally and kept separate from
+manually logged activities and Gemini requests. Turning tracking off stops
+future reads without deleting saved snapshots; use the existing data wipe
+control to remove local records.
 
 This is app-level usage, not touch-by-touch interaction or website history.
 Browser usage only identifies the browser app. Exact site tracking would need a
@@ -73,8 +76,9 @@ Usage Access is an Android system setting, not a runtime permission prompt.
 
 ### Tasks, reminders, and the home-screen widget
 
-Use the **Tasks** tab to create one-time, daily, or weekly intentions, choose a
-preferred time, and optionally enable a reminder. Android task reminders use
+Use **Focus → Tasks** to create one-time, daily, or weekly intentions, choose a
+preferred time, and optionally enable a reminder. **Plan** contains Today’s
+Flow and the activity log. Android task reminders use
 local system notifications and are restored after device restart. Tapping a
 reminder opens a check-in so you can mark the task done; repeat reminders move
 to the next occurrence after a check-in. Android's idle/battery and notification
@@ -82,9 +86,16 @@ settings may delay or suppress delivery; these alarms are not guaranteed to the
 exact minute. In a web browser,
 reminders use the Notifications API and can only fire while Solis remains open.
 
-Add the **Solis** widget from Android's home-screen widget picker. It shows the
-next planned task and today's completion count, and opens the Tasks tab. The
-widget updates when Solis is opened and when a task is changed.
+Add the **Awake** widgets from Android's home-screen widget picker. Focus Stats
+shows seven days of focus totals; Active Focus reads the Android timer service
+and offers start, pause/resume, and stop controls; Money logs local saved/spent
+entries against the configured goal; Daily Usage shows foreground intervals
+with a screen-on comparison and app legend. Configure palette and widget-
+specific options after adding each widget. Money quick actions only create an
+Awake entry; they never make a payment or contact a bank. Widgets refresh when
+Awake data changes and on return to the app, with Android-allowed periodic
+updates. Android launcher and background limits apply, so widget refreshes
+aren't guaranteed to be immediate.
 
 ### Savings currency and lending records
 

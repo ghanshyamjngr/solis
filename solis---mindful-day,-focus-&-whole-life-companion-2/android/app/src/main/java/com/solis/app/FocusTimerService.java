@@ -40,6 +40,8 @@ public class FocusTimerService extends Service {
                 return;
             }
             showRunningNotification();
+            updateFocusWidget(focusWidgetStatus(),
+                isRunning() ? "Tap to pause" : "Tap to resume");
             long untilCompletion = isPreset() ? Math.max(1_000L, remaining * 1000L) : 30_000L;
             handler.postDelayed(this, Math.min(30_000L, untilCompletion));
         }
@@ -55,13 +57,18 @@ public class FocusTimerService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
         try {
+            if (isActive() && (ACTION_PAUSE.equals(action) || ACTION_RESUME.equals(action)
+                || ACTION_FINISH.equals(action) || ACTION_WIDGET_ACTION.equals(action))) {
+                startForeground(NOTIFICATION_ID, buildRunningNotification());
+            }
             if (ACTION_START.equals(action)) {
                 startSession(intent);
             } else if (ACTION_WIDGET_ACTION.equals(action)) {
                 if (!isActive()) {
                     Intent quickFocus = new Intent();
                     quickFocus.putExtra("mode", "preset");
-                    quickFocus.putExtra("durationSeconds", 25 * 60);
+                    quickFocus.putExtra("durationSeconds",
+                        intent.getIntExtra("durationSeconds", 25 * 60));
                     quickFocus.putExtra("intention", "Focus session");
                     quickFocus.putExtra("soundEnabled", true);
                     quickFocus.putExtra("vibrationEnabled", true);
@@ -69,7 +76,7 @@ public class FocusTimerService extends Service {
                 } else if (!isRunning()) {
                     resumeSession();
                 } else {
-                    showRunningNotification();
+                    pauseSession();
                 }
             } else if (!isActive()) {
                 stopSelf();
@@ -331,6 +338,14 @@ public class FocusTimerService extends Service {
     }
 
     static Bundle readState(Context context) {
+        return readState(context, true);
+    }
+
+    static Bundle readWidgetState(Context context) {
+        return readState(context, false);
+    }
+
+    private static Bundle readState(Context context, boolean consumeCompleted) {
         android.content.SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         Bundle state = new Bundle();
         boolean active = prefs.getBoolean("active", false);
@@ -350,7 +365,7 @@ public class FocusTimerService extends Service {
         state.putLong("startedAt", prefs.getLong("anchorWall", 0));
         boolean completed = prefs.getBoolean("completed", false);
         state.putBoolean("completed", completed);
-        if (completed) prefs.edit().remove("completed").apply();
+        if (completed && consumeCompleted) prefs.edit().remove("completed").apply();
         return state;
     }
 

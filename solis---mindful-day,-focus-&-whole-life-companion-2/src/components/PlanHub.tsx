@@ -1,48 +1,52 @@
 import React from 'react';
-import { ActivityEntry, PlannedTask, UserPreferences } from '../types';
+import { ActivityEntry, DailyDeviceUsage, PlannedTask, UserPreferences } from '../types';
 import { ActivityLogger } from './ActivityLogger';
-import { TaskManager } from './TaskManager';
+import { DailyTimeline } from './DailyTimeline';
 
 interface PlanHubProps {
-  mode: 'tasks' | 'log';
-  onModeChange: (mode: 'tasks' | 'log') => void;
+  mode: 'flow' | 'log';
+  onModeChange: (mode: 'flow' | 'log') => void;
   selectedDate: string;
+  entries: ActivityEntry[];
   tasks: PlannedTask[];
-  reminderStatus: string;
-  pendingTaskId: string | null;
+  deviceUsage: DailyDeviceUsage | null;
+  usageTrackingEnabled: boolean;
+  usageStatus: string;
+  isUsageRefreshing: boolean;
+  onRefreshUsage: () => void;
   preferences: UserPreferences;
-  onAddTask: (task: PlannedTask) => Promise<void>;
-  onToggleTask: (task: PlannedTask, date: string) => void;
-  onDeleteTask: (id: string) => void;
-  onDismissCheckin: () => void;
+  onDeleteEntry: (id: string) => void;
   onSaveEntry: (entry: ActivityEntry) => void;
   onViewToday: () => void;
+  onViewFocus: () => void;
 }
 
 export const PlanHub: React.FC<PlanHubProps> = ({
   mode,
   onModeChange,
   selectedDate,
+  entries,
   tasks,
-  reminderStatus,
-  pendingTaskId,
+  deviceUsage,
+  usageTrackingEnabled,
+  usageStatus,
+  isUsageRefreshing,
+  onRefreshUsage,
   preferences,
-  onAddTask,
-  onToggleTask,
-  onDeleteTask,
-  onDismissCheckin,
+  onDeleteEntry,
   onSaveEntry,
   onViewToday,
+  onViewFocus,
 }) => (
   <div className="space-y-4">
     <div className="mx-auto flex w-fit rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" aria-label="Plan tools">
       <button
         type="button"
-        onClick={() => onModeChange('tasks')}
-        aria-pressed={mode === 'tasks'}
-        className={`rounded-lg px-4 py-2 text-xs font-semibold ${mode === 'tasks' ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}
+        onClick={() => onModeChange('flow')}
+        aria-pressed={mode === 'flow'}
+        className={`rounded-lg px-4 py-2 text-xs font-semibold ${mode === 'flow' ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}
       >
-        Tasks
+        Today’s Flow
       </button>
       <button
         type="button"
@@ -53,16 +57,21 @@ export const PlanHub: React.FC<PlanHubProps> = ({
         Log activity
       </button>
     </div>
-    {mode === 'tasks' ? (
-      <TaskManager
-        selectedDate={selectedDate}
+    {mode === 'flow' ? (
+      <DailyTimeline
+        date={selectedDate}
+        entries={entries}
         tasks={tasks}
-        reminderStatus={reminderStatus}
-        pendingTaskId={pendingTaskId}
-        onAddTask={onAddTask}
-        onToggleTask={onToggleTask}
-        onDeleteTask={onDeleteTask}
-        onDismissCheckin={onDismissCheckin}
+        deviceUsage={deviceUsage}
+        usageTrackingEnabled={usageTrackingEnabled}
+        usageStatus={usageStatus}
+        isUsageRefreshing={isUsageRefreshing}
+        onRefreshUsage={onRefreshUsage}
+        preferences={preferences}
+        onDeleteEntry={onDeleteEntry}
+        onNavigateToLog={() => onModeChange('log')}
+        onNavigateToTimer={onViewFocus}
+        showInsights={false}
       />
     ) : (
       <ActivityLogger

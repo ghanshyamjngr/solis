@@ -33,6 +33,11 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   aiUsageDataSharingConsent: false,
   usageTrackingEnabled: false,
   profileName: '',
+  firstName: '',
+  lastName: '',
+  profilePhotoDataUrl: '',
+  profilePhotoPositionX: 50,
+  profilePhotoPositionY: 50,
   personalGoals: '',
   dailyRoutine: '',
 };
@@ -155,6 +160,19 @@ export function loadStoredPreferences(): UserPreferences {
         ? stored.statsGraphStyle
         : DEFAULT_PREFERENCES.statsGraphStyle,
       profileName: typeof stored.profileName === 'string' ? stored.profileName.slice(0, 80) : '',
+      firstName: typeof stored.firstName === 'string' ? stored.firstName.slice(0, 80) : '',
+      lastName: typeof stored.lastName === 'string' ? stored.lastName.slice(0, 80) : '',
+      profilePhotoDataUrl: typeof stored.profilePhotoDataUrl === 'string'
+        && stored.profilePhotoDataUrl.startsWith('data:image/')
+        && stored.profilePhotoDataUrl.length <= 1_000_000
+        ? stored.profilePhotoDataUrl
+        : '',
+      profilePhotoPositionX: Number.isFinite(stored.profilePhotoPositionX)
+        ? Math.max(0, Math.min(100, stored.profilePhotoPositionX))
+        : 50,
+      profilePhotoPositionY: Number.isFinite(stored.profilePhotoPositionY)
+        ? Math.max(0, Math.min(100, stored.profilePhotoPositionY))
+        : 50,
       personalGoals: typeof stored.personalGoals === 'string' ? stored.personalGoals.slice(0, 500) : '',
       dailyRoutine: typeof stored.dailyRoutine === 'string' ? stored.dailyRoutine.slice(0, 500) : '',
       appearanceMode: stored.appearanceMode
@@ -249,7 +267,9 @@ export function loadStoredDeviceUsage(date = getTodayDateString()): DailyDeviceU
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(`${STORAGE_KEYS.DEVICE_USAGE_PREFIX}${date}`);
-    return raw ? JSON.parse(raw) as DailyDeviceUsage : null;
+    if (!raw) return null;
+    const usage = JSON.parse(raw) as DailyDeviceUsage;
+    return usage.measurementVersion === 2 ? usage : null;
   } catch (err) {
     console.error('Failed to load Android usage data from localStorage', err);
     return null;
@@ -286,9 +306,16 @@ function loadAllStoredDeviceUsage(): DailyDeviceUsage[] {
   for (let index = 0; index < localStorage.length; index++) {
     const key = localStorage.key(index);
     if (!key?.startsWith(STORAGE_KEYS.DEVICE_USAGE_PREFIX)) continue;
-    const date = key.slice(STORAGE_KEYS.DEVICE_USAGE_PREFIX.length);
-    const snapshot = loadStoredDeviceUsage(date);
-    if (snapshot) snapshots.push(snapshot);
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const snapshot = JSON.parse(raw) as DailyDeviceUsage;
+      if (snapshot && typeof snapshot.date === 'string' && Array.isArray(snapshot.apps)) {
+        snapshots.push(snapshot);
+      }
+    } catch (error) {
+      console.error(`Failed to include saved Android usage from ${key} in backup`, error);
+    }
   }
   return snapshots;
 }

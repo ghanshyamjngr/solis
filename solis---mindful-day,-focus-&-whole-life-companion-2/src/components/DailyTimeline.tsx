@@ -42,6 +42,7 @@ interface DailyTimelineProps {
   onDeleteEntry: (id: string) => void;
   onNavigateToLog: () => void;
   onNavigateToTimer: () => void;
+  showInsights?: boolean;
 }
 
 export const DailyTimeline: React.FC<DailyTimelineProps> = ({
@@ -57,6 +58,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
   onDeleteEntry,
   onNavigateToLog,
   onNavigateToTimer,
+  showInsights = true,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
       }}
     >
       {/* Daily Insights Component: Total focus time, activity breakdown, and AI reflections */}
-      <DailyInsights
+      {showInsights && <DailyInsights
         entries={entries.filter((entry) => entry.source !== 'demo')}
         tasks={tasks}
         deviceUsage={deviceUsage}
@@ -138,7 +140,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
         preferences={preferences}
         onStartFocus={onNavigateToTimer}
         onLogOffline={onNavigateToLog}
-      />
+      />}
 
       {/* Top Banner: Day Summary & Philosophy */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700/80 p-6 sm:p-7 shadow-xs">
